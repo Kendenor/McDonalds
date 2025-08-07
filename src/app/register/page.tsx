@@ -15,6 +15,9 @@ import {
 import { User, Lock, Eye, EyeOff, Ticket, Loader } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { generateEmailAddress, getAuthErrorMessage } from '@/lib/utils';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -80,15 +83,15 @@ export default function RegisterPage() {
     }
     setIsLoading(true);
     try {
-      // Add your registration logic here (e.g., Firebase auth)
-      // await registerWithPhoneAndPassword(phone, password, referralCode);
+      const email = generateEmailAddress(phone);
+      await createUserWithEmailAndPassword(auth, email, password);
       toast({ title: "Registration successful!" });
       router.push("/dashboard");
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Registration Failed",
-        description: error.message || "An error occurred during registration.",
+        description: getAuthErrorMessage(error, 'registration'),
       });
     } finally {
       setIsLoading(false);

@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { generateEmailAddress, getAuthErrorMessage } from '@/lib/utils';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,15 +44,15 @@ export default function LoginPage() {
     }
     setIsLoading(true);
     try {
-      // Add your login logic here (e.g., Firebase auth)
-      // await signInWithPhoneAndPassword(phone, password);
+      const email = generateEmailAddress(phone);
+      await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "Login successful!" });
       router.push("/dashboard");
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "An error occurred during login.",
+        description: getAuthErrorMessage(error, 'login'),
       });
     } finally {
       setIsLoading(false);
@@ -77,8 +83,8 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-6" onSubmit={handleLogin}>
             <div className="space-y-2">
-              <label htmlFor="phone">Phone</label>
-              <input
+              <Label htmlFor="phone">Phone</Label>
+              <Input
                 id="phone"
                 type="text"
                 placeholder="Phone number"
@@ -88,8 +94,8 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password">Password</label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 type="password"
                 placeholder="Password"
@@ -98,9 +104,9 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
-            </button>
+            </Button>
           </form>
         </CardContent>
       </Card>
