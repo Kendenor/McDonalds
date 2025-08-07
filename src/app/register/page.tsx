@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 
 'use client';
 import { useState, useEffect } from 'react';
@@ -14,11 +15,40 @@ import {
 } from '@/components/ui/card';
 import { User, Lock, Eye, EyeOff, Ticket, Loader } from 'lucide-react';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { UserService, AdminNotificationService, ReferralService } from '@/lib/user-service';
-import { generateEmailAddress, formatPhoneNumber, getAuthErrorMessage } from '@/lib/utils';
+
+// Dynamic imports to prevent SSR issues
+const createUserWithEmailAndPassword = async () => {
+  if (typeof window !== 'undefined') {
+    const { createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
+    return createUser;
+  }
+  return null;
+};
+
+const getFirebaseAuth = async () => {
+  if (typeof window !== 'undefined') {
+    const { auth } = await import('@/lib/firebase');
+    return auth;
+  }
+  return null;
+};
+
+const getServices = async () => {
+  if (typeof window !== 'undefined') {
+    const { UserService, AdminNotificationService, ReferralService } = await import('@/lib/user-service');
+    return { UserService, AdminNotificationService, ReferralService };
+  }
+  return null;
+};
+
+const getUtils = async () => {
+  if (typeof window !== 'undefined') {
+    const { generateEmailAddress, formatPhoneNumber, getAuthErrorMessage } = await import('@/lib/utils');
+    return { generateEmailAddress, formatPhoneNumber, getAuthErrorMessage };
+  }
+  return null;
+};
 
 function McDonaldLogo() {
   return (
@@ -58,7 +88,6 @@ function McDonaldLogo() {
   );
 }
 
-
 export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,16 +98,23 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
-    const refCode = searchParams.get('ref');
-    if (refCode) {
-        setReferralCode(refCode);
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && searchParams) {
+      const refCode = searchParams.get('ref');
+      if (refCode) {
+          setReferralCode(refCode);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, isClient]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
@@ -103,6 +139,15 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isClient) {
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: "Please wait for the page to load completely." 
+      });
+      return;
+    }
+
     if (!phone || phone.length !== 10) {
       toast({ 
         variant: "destructive", 
@@ -119,6 +164,21 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      // Dynamically import all required services
+      const [createUserFn, auth, services, utils] = await Promise.all([
+        createUserWithEmailAndPassword(),
+        getFirebaseAuth(),
+        getServices(),
+        getUtils()
+      ]);
+
+      if (!createUserFn || !auth || !services || !utils) {
+        throw new Error('Failed to initialize services');
+      }
+
+      const { UserService, AdminNotificationService, ReferralService } = services;
+      const { generateEmailAddress, formatPhoneNumber, getAuthErrorMessage } = utils;
+
       // Validate phone number format
       let formattedPhone;
       try {
@@ -136,7 +196,7 @@ export default function RegisterPage() {
       
       // Note: Firebase will handle duplicate email check automatically
       
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserFn(auth, email, password);
       
       // Generate referral code for new user
       const newUserReferralCode = ReferralService.generateReferralCode();
@@ -211,12 +271,21 @@ export default function RegisterPage() {
       
       // Check if it's a Firebase auth error
       if (error.code) {
-        const message = getAuthErrorMessage(error, 'registration');
-        toast({
-          variant: "destructive",
-          title: "Registration Failed",
-          description: message,
-        });
+        const utils = await getUtils();
+        if (utils) {
+          const message = utils.getAuthErrorMessage(error, 'registration');
+          toast({
+            variant: "destructive",
+            title: "Registration Failed",
+            description: message,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Registration Failed",
+            description: "An error occurred during registration. Please try again.",
+          });
+        }
       } else {
         // Handle other errors (like Firestore permission errors)
         // Check if this might be a referral processing error that shouldn't fail registration
@@ -248,6 +317,26 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while not client-side
+  if (!isClient) {
+    return (
+      <div className="dark flex items-center justify-center min-h-screen bg-background p-4">
+        <Card className="w-full max-w-md bg-card border-none shadow-2xl shadow-primary/20">
+          <CardHeader className="text-center">
+            <div className="mx-auto">
+              <McDonaldLogo />
+            </div>
+            <CardTitle className="text-3xl font-bold text-primary">McDonald's</CardTitle>
+            <CardDescription>Loading...</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Loader className="animate-spin h-8 w-8" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="dark flex items-center justify-center min-h-screen bg-background p-4">
