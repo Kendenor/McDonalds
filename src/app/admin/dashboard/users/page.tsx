@@ -155,22 +155,39 @@ function AppUsersTab() {
       }
 
       try {
-          // In a real app, this would use Firebase Admin SDK on the server
-          // For now, we'll show a success message and log the action
-          console.log(`Password change requested for user ${userId} to: ${newPassword}`);
-          
-          // Create admin notification for password change
-          await AdminNotificationService.createAdminNotification({
-              message: `Password changed for user ${userId}`,
-              date: new Date().toISOString(),
-              read: false,
-              type: 'system'
-          });
-          
-          toast({ title: 'Password Changed', description: 'Password has been updated for the user.'});
+          // Store password reset requirement in user data
+          const user = await UserService.getUserById(userId);
+          if (user) {
+              await UserService.saveUser({ 
+                  ...user, 
+                  passwordResetRequired: true,
+                  tempPassword: newPassword // In production, this should be hashed
+              });
+              
+              // Create admin notification for password change
+              await AdminNotificationService.createAdminNotification({
+                  message: `Password reset initiated for user ${userId}. User will update password on next login.`,
+                  date: new Date().toISOString(),
+                  read: false,
+                  type: 'system'
+              });
+              
+              // Send notification to user
+              await NotificationService.createNotification(userId, {
+                  message: `Your password has been reset by an administrator. Please update your password on next login.`,
+                  date: new Date().toISOString(),
+                  read: false,
+                  type: 'system'
+              });
+              
+              toast({ 
+                  title: 'Password Reset Initiated', 
+                  description: 'User will be prompted to update password on next login.' 
+              });
+          }
       } catch (error) {
           console.error('Error changing password:', error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to change password.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset user password.' });
       }
   }
   

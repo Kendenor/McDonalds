@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { generateEmailAddress, getAuthErrorMessage } from '@/lib/utils';
+import { UserService } from '@/lib/user-service';
 
 export default function RegisterClient() {
   const router = useRouter();
@@ -83,8 +84,28 @@ export default function RegisterClient() {
     setIsLoading(true);
     try {
       const email = generateEmailAddress(phone);
-      await createUserWithEmailAndPassword(auth, email, password);
-      toast({ title: "Registration successful!" });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Create user profile with welcome bonus
+      const newUser = {
+        id: userCredential.user.uid,
+        email: email,
+        phone: phone,
+        regDate: new Date().toISOString(),
+        investment: '₦0',
+        status: 'Active' as const,
+        balance: 300, // Welcome bonus
+        totalDeposits: 0,
+        totalWithdrawals: 0,
+        referralCode: referralCode || undefined,
+      };
+      
+      await UserService.saveUser(newUser);
+      
+      toast({ 
+        title: "Registration successful!", 
+        description: "Welcome bonus of ₦300 has been added to your account!" 
+      });
       router.push("/dashboard");
     } catch (error: any) {
       toast({
@@ -111,53 +132,73 @@ export default function RegisterClient() {
           <form className="space-y-6" onSubmit={handleRegister}>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="text"
-                placeholder="Phone number"
-                className="pl-10"
-                value={phone}
-                onChange={handlePhoneChange}
-              />
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="phone"
+                  type="text"
+                  placeholder="Phone number"
+                  className="pl-10"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                className="pl-10"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <Button type="button" onClick={() => setShowPassword((v) => !v)}>
-                {showPassword ? <EyeOff /> : <Eye />} Show/Hide
-              </Button>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  className="pl-10 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Confirm Password"
-                className="pl-10"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-              <Button type="button" onClick={() => setShowConfirmPassword((v) => !v)}>
-                {showConfirmPassword ? <EyeOff /> : <Eye />} Show/Hide
-              </Button>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm Password"
+                  className="pl-10 pr-10"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="referralCode">Referral Code (optional)</Label>
-              <Input
-                id="referralCode"
-                type="text"
-                placeholder="Referral code"
-                className="pl-10"
-                value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value)}
-              />
+              <div className="relative">
+                <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="referralCode"
+                  type="text"
+                  placeholder="Referral code"
+                  className="pl-10"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                />
+              </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base" disabled={isLoading}>
               {isLoading ? 'Registering...' : 'Register'}
