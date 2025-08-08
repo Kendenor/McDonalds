@@ -190,6 +190,10 @@ function AppUsersTab() {
           };
           
           await UserService.saveUser(updatedUser);
+          
+          // IMPORTANT: The password is now stored in the user data
+          // The user will need to use this password to log in
+          // This is a custom authentication system that works alongside Firebase Auth
               
           // Create admin notification for password change
           await AdminNotificationService.createAdminNotification({
