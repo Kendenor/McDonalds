@@ -30,6 +30,14 @@ export interface AppSettings {
   minDeposit?: number;
   maxDeposit?: number;
   minWithdrawal?: number;
+  popupContent?: {
+    welcomeMessage?: string;
+    notificationTitle?: string;
+    depositSuccessMessage?: string;
+    withdrawalSuccessMessage?: string;
+    referralBonusMessage?: string;
+    dailyLoginMessage?: string;
+  };
   updatedAt?: any;
 }
 
@@ -64,7 +72,15 @@ export class SettingsService {
           bankAccounts: [],
           minDeposit: 3000,
           maxDeposit: 500000,
-          minWithdrawal: 1000
+          minWithdrawal: 1000,
+          popupContent: {
+            welcomeMessage: 'Welcome to McDonald Investment! Your ₦300 welcome bonus has been added to your account.',
+            notificationTitle: 'Notifications',
+            depositSuccessMessage: 'Deposit successful! Your funds have been added to your account.',
+            withdrawalSuccessMessage: 'Withdrawal request submitted successfully!',
+            referralBonusMessage: 'Referral bonus received! Your earnings have been updated.',
+            dailyLoginMessage: 'Daily login bonus of ₦50 has been added to your account!'
+          }
         };
       }
     } catch (error) {
@@ -112,7 +128,15 @@ export class SettingsService {
           bankAccounts: [],
           minDeposit: 3000,
           maxDeposit: 500000,
-          minWithdrawal: 1000
+          minWithdrawal: 1000,
+          popupContent: {
+            welcomeMessage: 'Welcome to McDonald Investment! Your ₦300 welcome bonus has been added to your account.',
+            notificationTitle: 'Notifications',
+            depositSuccessMessage: 'Deposit successful! Your funds have been added to your account.',
+            withdrawalSuccessMessage: 'Withdrawal request submitted successfully!',
+            referralBonusMessage: 'Referral bonus received! Your earnings have been updated.',
+            dailyLoginMessage: 'Daily login bonus of ₦50 has been added to your account!'
+          }
         });
       }
     });
