@@ -143,21 +143,10 @@ export default function DepositsPage() {
         const userData = await UserService.getUserById(transaction.userId);
         const isFirstDeposit = userData && !userData.hasDeposited;
         
-        console.log('=== DEPOSIT APPROVAL PROCESS ===');
-        console.log('Transaction ID:', id);
-        console.log('User ID:', transaction.userId);
-        console.log('User email:', transaction.userEmail);
-        console.log('Deposit amount:', transaction.amount);
-        console.log('Is first deposit:', isFirstDeposit);
-        console.log('User hasDeposited before:', userData?.hasDeposited);
-        
         // Process referral bonus BEFORE updating user data (for first deposits only)
         if (isFirstDeposit) {
           try {
-            console.log('Processing referral bonus for first deposit - user:', transaction.userId, 'amount:', transaction.amount);
-            console.log('User data before processing:', userData);
             await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
-            console.log('Referral bonus processed successfully');
           } catch (error) {
             console.error('Error processing referral bonus:', error);
             toast({ 
@@ -166,8 +155,6 @@ export default function DepositsPage() {
               description: 'Deposit approved but referral bonus processing failed. Please check the console for details.' 
             });
           }
-        } else {
-          console.log('Not first deposit, skipping referral bonus processing');
         }
         
         // Update user's balance when deposit is approved
@@ -181,7 +168,6 @@ export default function DepositsPage() {
               firstDepositDate: new Date().toISOString()
             };
             await UserService.saveUser(updatedUser);
-            console.log('User balance updated successfully');
           }
         } catch (error) {
           console.error('Error updating user balance:', error);

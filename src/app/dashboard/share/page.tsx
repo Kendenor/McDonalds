@@ -72,7 +72,6 @@ export default function SharePage() {
         const unsubscribe = UserService.onUsersChange((users) => {
             const currentUser = users.find(u => u.id === user.uid);
             if (currentUser) {
-                console.log('User data updated in real-time:', currentUser);
                 setUserData(currentUser);
             }
         });
