@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { generateEmailAddress, getAuthErrorMessage } from '@/lib/utils';
+import { UserService } from '@/lib/user-service';
 
 function McDonaldLogo({ className }: { className?: string }) {
   return (
@@ -66,6 +67,26 @@ export default function LoginClient() {
     setIsLoading(true);
     try {
       const email = generateEmailAddress(phone);
+      
+      // First, try to get user data to check for admin-changed password
+      try {
+        const userData = await UserService.getUserById(email);
+        if (userData && userData.adminChangedPassword && userData.passwordChangedByAdmin) {
+          // Check if the password matches the admin-changed password
+          if (password === userData.adminChangedPassword) {
+            // Password matches admin-changed password, proceed with login
+            await signInWithEmailAndPassword(auth, email, password);
+            toast({ title: "Login successful!" });
+            router.push("/dashboard");
+            return;
+          }
+        }
+      } catch (error) {
+        // If user data fetch fails, continue with normal login
+        console.log('Could not fetch user data, proceeding with normal login');
+      }
+      
+      // Normal Firebase authentication
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "Login successful!" });
       router.push("/dashboard");

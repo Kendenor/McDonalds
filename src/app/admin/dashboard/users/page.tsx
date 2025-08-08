@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast'
-import { onAuthStateChanged, User as FirebaseUser, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
+import { onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, updatePassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { UserService, NotificationService, TransactionService, AdminNotificationService } from '@/lib/user-service'
 
@@ -181,17 +181,19 @@ function AppUsersTab() {
 
       setIsChangingPassword(true);
       try {
-          // Send password reset email to user
-          await sendPasswordResetEmail(auth, selectedUserForPassword.email);
+          // Store the new password in user data
+          const updatedUser = {
+              ...selectedUserForPassword,
+              adminChangedPassword: newPassword,
+              passwordChangedByAdmin: true,
+              passwordChangeDate: new Date().toISOString()
+          };
           
-          // Store the new password in user data for admin reference
-          await UserService.saveUser({
-              ...selectedUserForPassword
-          });
+          await UserService.saveUser(updatedUser);
               
           // Create admin notification for password change
           await AdminNotificationService.createAdminNotification({
-              message: `Password reset email sent to ${selectedUserForPassword.email}. New password: ${newPassword}`,
+              message: `Password changed for ${selectedUserForPassword.email}. New password: ${newPassword}`,
               date: new Date().toISOString(),
               read: false,
               type: 'system'
@@ -200,15 +202,15 @@ function AppUsersTab() {
           // Send notification to user
           await NotificationService.createNotification({
               userId: selectedUserForPassword.id,
-              message: `A password reset email has been sent to your email. Please check your inbox and follow the instructions to set your new password.`,
+              message: `Your password has been changed by an administrator. Your new password is: ${newPassword}. Please log in with this password.`,
               date: new Date().toISOString(),
               read: false,
               type: 'system'
           });
               
           toast({ 
-              title: 'Password Reset Email Sent', 
-              description: `Password reset email sent to ${selectedUserForPassword.email}. The new password is: ${newPassword}` 
+              title: 'Password Changed Successfully', 
+              description: `Password has been changed for ${selectedUserForPassword.email}. New password: ${newPassword}. IMPORTANT: Please inform the user of their new password. The password is now stored in the system.` 
           });
           
           setShowPasswordModal(false);
@@ -216,7 +218,7 @@ function AppUsersTab() {
           setNewPassword('');
       } catch (error) {
           console.error('Error changing password:', error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to send password reset email.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to change password.' });
       } finally {
           setIsChangingPassword(false);
       }
@@ -452,7 +454,7 @@ function AppUsersTab() {
                 <div className="space-y-2">
                   <div>User: <span className="font-semibold">{selectedUserForPassword.email}</span></div>
                   <div className="text-sm text-muted-foreground">
-                    Enter a new password for this user. A password reset email will be sent to the user.
+                    Enter a new password for this user. The password will be changed immediately.
                   </div>
                 </div>
               ) : (
@@ -493,10 +495,10 @@ function AppUsersTab() {
               {isChangingPassword ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  Sending Reset Email...
+                  Changing Password...
                 </>
               ) : (
-                'Send Reset Email'
+                'Change Password'
               )}
             </Button>
           </DialogFooter>
