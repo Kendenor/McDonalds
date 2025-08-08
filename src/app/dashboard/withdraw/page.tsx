@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { UserService, TransactionService, AdminNotificationService } from '@/lib/user-service';
+import { SettingsService } from '@/lib/firebase-service';
 
 interface BankAccount {
     bankName: string;
@@ -31,6 +32,7 @@ export default function WithdrawPage() {
     const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [user, setUser] = useState<User | null>(null);
+    const [minWithdrawal, setMinWithdrawal] = useState(1000);
     
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -50,6 +52,10 @@ export default function WithdrawPage() {
                     setBalance(0);
                 }
 
+                // Load settings for minimum withdrawal
+                const settings = await SettingsService.getSettings();
+                setMinWithdrawal(settings.minWithdrawal || 1000);
+
                 // Load bank account from Firestore (assuming it's stored in user data)
                 // For now, we'll use a placeholder - you may need to create a separate bank account service
                 const savedAccount = localStorage.getItem(`bankAccount_${currentUser.uid}`);
@@ -66,7 +72,7 @@ export default function WithdrawPage() {
     }, []);
 
     const rules = [
-        "Min withdrawal: ₦1,000",
+        `Min withdrawal: ₦${minWithdrawal.toLocaleString()}`,
         `Charges: ${WITHDRAWAL_CHARGE_PERCENT * 100}%`,
         `Time: ${WITHDRAWAL_START_HOUR}:00 - ${WITHDRAWAL_END_HOUR}:00 daily`,
         "Ensure correct account details",
@@ -92,8 +98,8 @@ export default function WithdrawPage() {
             toast({ variant: 'destructive', title: 'No Bank Account', description: 'Please add a bank account first.' });
             return;
         }
-        if (isNaN(withdrawAmount) || withdrawAmount < 1000) {
-            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Minimum withdrawal is ₦1,000.' });
+        if (isNaN(withdrawAmount) || withdrawAmount < minWithdrawal) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: `Minimum withdrawal is ₦${minWithdrawal.toLocaleString()}.` });
             return;
         }
         
@@ -119,7 +125,7 @@ export default function WithdrawPage() {
             // Update user balance in Firestore
             const userData = await UserService.getUserById(user.uid);
             if (userData) {
-                const newBalance = userData.balance - withdrawAmount;
+                const newBalance = (userData.balance || 0) - withdrawAmount;
                 await UserService.saveUser({ ...userData, balance: newBalance });
                 setBalance(newBalance);
             }

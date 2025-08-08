@@ -1,234 +1,209 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import { Loader, Trash2, PlusCircle } from 'lucide-react'
-import { SettingsService, BankAccountService, AppSettings, BankAccount } from '@/lib/firebase-service'
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { FirebaseInit } from '@/lib/firebase-init';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Settings, Save, Loader } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { SettingsService } from '@/lib/firebase-service';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
-interface InfoItem {
-    text: string;
+interface AppSettings {
+  telegramLink: string;
+  whatsappLink: string;
+  infoItems: Array<{ text: string }>;
+  bankAccounts: any[];
+  minDeposit?: number;
+  maxDeposit?: number;
+  minWithdrawal?: number;
+  updatedAt?: any;
 }
 
-const defaultInfoItems: InfoItem[] = [
-    { text: "Profit drops every 24 hours" },
-    { text: "Level 1 - 24% Level 2 - 3% Level 3 - 2%" },
-    { text: "Withdrawal: 10am - 6pm daily" },
-    { text: "Deposit: 24/7" },
-    { text: "Daily Login bonus: ₦50" },
-    { text: "Welcome bonus: ₦550" },
-    { text: "Minimum deposit: ₦3,000" },
-    { text: "Withdrawal charge: 15%" },
-    { text: "Minimum withdrawal: ₦1,000" },
-]
+export default function AdminSettingsPage() {
+  const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>({
+    telegramLink: '',
+    whatsappLink: '',
+    infoItems: [],
+    bankAccounts: [],
+    minDeposit: 3000,
+    maxDeposit: 500000,
+    minWithdrawal: 1000
+  });
 
-export default function SettingsPage() {
-    const { toast } = useToast()
-    const [telegramLink, setTelegramLink] = useState('')
-    const [whatsappLink, setWhatsappLink] = useState('')
-    const [infoItems, setInfoItems] = useState<InfoItem[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [minDeposit, setMinDeposit] = useState(3000);
-    const [maxDeposit, setMaxDeposit] = useState(500000);
-    const [isLoading, setIsLoading] = useState(false)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await loadSettings();
+      }
+      setIsLoading(false);
+    });
 
-    useEffect(() => {
-        const loadSettings = async () => {
-            try {
-                const settings = await SettingsService.getSettings();
-                setTelegramLink(settings.telegramLink || '');
-                setWhatsappLink(settings.whatsappLink || '');
-                setInfoItems(settings.infoItems && settings.infoItems.length > 0 ? settings.infoItems : defaultInfoItems);
-                setBankAccounts(settings.bankAccounts || []);
-                setMinDeposit(settings.minDeposit || 3000);
-                setMaxDeposit(settings.maxDeposit || 500000);
-            } catch (error) {
-                console.error('Error loading settings:', error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to load settings from database.' });
-            }
-        };
-        loadSettings();
-    }, []);
-    
-    const handleInfoItemChange = (index: number, value: string) => {
-        const newItems = [...infoItems];
-        newItems[index].text = value;
-        setInfoItems(newItems);
+    return () => unsubscribe();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const currentSettings = await SettingsService.getSettings();
+      setSettings(currentSettings);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load settings.' });
     }
-    
-    const addInfoItem = () => {
-        setInfoItems([...infoItems, { text: '' }]);
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
+      return;
     }
 
-    const removeInfoItem = (index: number) => {
-        const newItems = infoItems.filter((_, i) => i !== index);
-        setInfoItems(newItems);
+    setIsSaving(true);
+    try {
+      await SettingsService.saveSettings(settings);
+      toast({ title: 'Settings Saved', description: 'Settings have been updated successfully.' });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save settings.' });
+    } finally {
+      setIsSaving(false);
     }
+  };
 
-    const handleBankAccountChange = (index: number, field: keyof BankAccount, value: string) => {
-        const newAccounts = [...bankAccounts];
-        newAccounts[index] = { ...newAccounts[index], [field]: value };
-        setBankAccounts(newAccounts);
-    }
+  const handleInputChange = (field: keyof AppSettings, value: string | number) => {
+    setSettings(prev => ({
+      ...prev,
+      [field]: typeof value === 'string' ? value : Number(value)
+    }));
+  };
 
-    const addBankAccount = () => {
-        setBankAccounts([...bankAccounts, { id: `acc-${Date.now()}`, bankName: '', accountNumber: '', accountName: '' }]);
-    }
-
-    const removeBankAccount = (id: string) => {
-        setBankAccounts(bankAccounts.filter(acc => acc.id !== id));
-    }
-
-
-    const handleSave = async () => {
-        setIsLoading(true);
-        try {
-            const settings: AppSettings = { 
-                telegramLink, 
-                whatsappLink, 
-                infoItems, 
-                bankAccounts,
-                minDeposit,
-                maxDeposit
-            };
-            
-            // Save to Firebase
-            await SettingsService.saveSettings(settings);
-            
-            // Also save to localStorage as backup
-            localStorage.setItem('globalSettings', JSON.stringify(settings));
-            
-            window.dispatchEvent(new Event('storage'));
-            toast({ title: 'Success', description: 'Settings saved to Firebase successfully.' });
-        } catch (error: any) {
-            // Fallback to localStorage only
-            const settings = { telegramLink, whatsappLink, infoItems, bankAccounts, minDeposit, maxDeposit };
-            localStorage.setItem('globalSettings', JSON.stringify(settings));
-            toast({ 
-                title: 'Firebase Error', 
-                description: `Failed to save to Firebase: ${error.message}. Saved to localStorage as backup.` 
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }
-
-
-
+  if (isLoading) {
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>App Settings</CardTitle>
-                    <CardDescription>Manage global application settings like social links, popup info, and deposit accounts.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-medium">Social Links</h3>
-                        <div className="space-y-2">
-                            <Label htmlFor="telegram">Telegram Group Link</Label>
-                            <Input id="telegram" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="https://t.me/yourgroup" />
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="whatsapp">WhatsApp Channel Link</Label>
-                            <Input id="whatsapp" value={whatsappLink} onChange={(e) => setWhatsappLink(e.target.value)} placeholder="https://whatsapp.com/channel/yourchannel" />
-                        </div>
-                    </div>
+      <div className="flex justify-center items-center h-48">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-medium">Deposit Limits</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="minDeposit">Minimum Deposit (₦)</Label>
-                                <Input 
-                                    id="minDeposit" 
-                                    type="number" 
-                                    value={minDeposit} 
-                                    onChange={(e) => setMinDeposit(Number(e.target.value))} 
-                                    placeholder="3000" 
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="maxDeposit">Maximum Deposit (₦)</Label>
-                                <Input 
-                                    id="maxDeposit" 
-                                    type="number" 
-                                    value={maxDeposit} 
-                                    onChange={(e) => setMaxDeposit(Number(e.target.value))} 
-                                    placeholder="500000" 
-                                />
-                            </div>
-                        </div>
-                    </div>
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Please log in to access admin settings.</p>
+      </div>
+    );
+  }
 
-                    <div className="space-y-4">
-                        <div className='flex justify-between items-center'>
-                             <div>
-                                <h3 className="text-lg font-medium">Deposit Bank Accounts</h3>
-                                <p className="text-sm text-muted-foreground">Manage bank accounts shown to users for deposits.</p>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={addBankAccount}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Add Account
-                            </Button>
-                        </div>
-                        <div className="space-y-3">
-                            {bankAccounts.map((account, index) => (
-                                <div key={account.id || `account-${index}`} className="flex flex-col sm:flex-row items-center gap-2 p-3 border rounded-lg">
-                                    <Input value={account.bankName} onChange={(e) => handleBankAccountChange(index, 'bankName', e.target.value)} placeholder="Bank Name (e.g. Access Bank)"/>
-                                    <Input value={account.accountNumber} onChange={(e) => handleBankAccountChange(index, 'accountNumber', e.target.value)} placeholder="Account Number"/>
-                                    <Input value={account.accountName} onChange={(e) => handleBankAccountChange(index, 'accountName', e.target.value)} placeholder="Account Name"/>
-                                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-400" onClick={() => removeBankAccount(account.id || `account-${index}`)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Admin Settings
+          </CardTitle>
+          <CardDescription>
+            Configure application settings and limits.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Deposit Limits */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Deposit Limits</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minDeposit">Minimum Deposit (₦)</Label>
+                <Input
+                  id="minDeposit"
+                  type="number"
+                  value={settings.minDeposit || 3000}
+                  onChange={(e) => handleInputChange('minDeposit', e.target.value)}
+                  placeholder="3000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxDeposit">Maximum Deposit (₦)</Label>
+                <Input
+                  id="maxDeposit"
+                  type="number"
+                  value={settings.maxDeposit || 500000}
+                  onChange={(e) => handleInputChange('maxDeposit', e.target.value)}
+                  placeholder="500000"
+                />
+              </div>
+            </div>
+          </div>
 
-                    <div className="space-y-4">
-                        <div className='flex justify-between items-center'>
-                             <div>
-                                <h3 className="text-lg font-medium">Info Popup Content</h3>
-                                <p className="text-sm text-muted-foreground">Manage the items displayed in the user dashboard info popup.</p>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={addInfoItem}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Add Item
-                            </Button>
-                        </div>
-                       
-                        <div className="space-y-3">
-                            {infoItems.map((item, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <Input
-                                        value={item.text}
-                                        onChange={(e) => handleInfoItemChange(index, e.target.value)}
-                                        placeholder="Enter info text..."
-                                    />
-                                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-400" onClick={() => removeInfoItem(index)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                        <Button onClick={handleSave} disabled={isLoading}>
-                            {isLoading && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Settings
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    )
+          {/* Withdrawal Limits */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Withdrawal Limits</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minWithdrawal">Minimum Withdrawal (₦)</Label>
+                <Input
+                  id="minWithdrawal"
+                  type="number"
+                  value={settings.minWithdrawal || 1000}
+                  onChange={(e) => handleInputChange('minWithdrawal', e.target.value)}
+                  placeholder="1000"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Social Links */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Social Links</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="telegramLink">Telegram Link</Label>
+                <Input
+                  id="telegramLink"
+                  type="url"
+                  value={settings.telegramLink}
+                  onChange={(e) => handleInputChange('telegramLink', e.target.value)}
+                  placeholder="https://t.me/yourchannel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsappLink">WhatsApp Link</Label>
+                <Input
+                  id="whatsappLink"
+                  type="url"
+                  value={settings.whatsappLink}
+                  onChange={(e) => handleInputChange('whatsappLink', e.target.value)}
+                  placeholder="https://wa.me/yournumber"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="w-full"
+          >
+            {isSaving ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Settings
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

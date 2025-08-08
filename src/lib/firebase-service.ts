@@ -29,6 +29,7 @@ export interface AppSettings {
   bankAccounts: BankAccount[];
   minDeposit?: number;
   maxDeposit?: number;
+  minWithdrawal?: number;
   updatedAt?: any;
 }
 
@@ -60,7 +61,10 @@ export class SettingsService {
             { text: "Withdrawal charge: 15%" },
             { text: "Minimum withdrawal: ₦1,000" },
           ],
-          bankAccounts: []
+          bankAccounts: [],
+          minDeposit: 3000,
+          maxDeposit: 500000,
+          minWithdrawal: 1000
         };
       }
     } catch (error) {
@@ -105,7 +109,10 @@ export class SettingsService {
             { text: "Withdrawal charge: 15%" },
             { text: "Minimum withdrawal: ₦1,000" },
           ],
-          bankAccounts: []
+          bankAccounts: [],
+          minDeposit: 3000,
+          maxDeposit: 500000,
+          minWithdrawal: 1000
         });
       }
     });

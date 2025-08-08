@@ -1504,9 +1504,11 @@ export class ReferralService {
     }
     try {
       const referrals = await this.getDirectReferrals(userId);
-      const totalEarnings = referrals.reduce((sum, user) => sum + (user.referralEarnings || 0), 0);
       const referralsWithDeposits = referrals.filter(user => user.hasDeposited).length;
       const referralsWithoutDeposits = referrals.filter(user => !user.hasDeposited).length;
+
+      // Calculate total earnings from all referral levels
+      const totalEarnings = await this.getTotalReferralEarnings(userId);
 
       return {
         referrals,
@@ -1518,6 +1520,25 @@ export class ReferralService {
     } catch (error) {
       console.error('Error getting referral details:', error);
       throw error;
+    }
+  }
+
+  // Get total referral earnings from transactions
+  private static async getTotalReferralEarnings(userId: string): Promise<number> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get referral earnings');
+      return 0;
+    }
+    try {
+      const userTransactions = await TransactionService.getTransactionsByUser(userId);
+      const referralTransactions = userTransactions.filter(
+        transaction => transaction.type === 'Referral_Bonus' && transaction.status === 'Completed'
+      );
+      
+      return referralTransactions.reduce((total, transaction) => total + transaction.amount, 0);
+    } catch (error) {
+      console.error('Error getting referral earnings:', error);
+      return 0;
     }
   }
 }
