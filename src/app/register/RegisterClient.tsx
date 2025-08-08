@@ -124,22 +124,13 @@ export default function RegisterClient() {
 
       await UserService.saveUser(newUser);
       
-      // Process referral bonus if referrer found
-      if (referrerId) {
-        try {
-          console.log('Processing referral bonus for new user:', userCredential.user.uid, 'referrer:', referrerId);
-          await ReferralService.processReferralBonus(userCredential.user.uid, referrerId);
-          console.log('Referral bonus processed successfully');
-        } catch (error) {
-          console.error('Error processing referral bonus:', error);
-          // Don't fail registration if referral processing fails
-        }
-      }
+      // Note: Referral bonuses are now processed when the user makes their first deposit
+      // This ensures referrers only get bonuses when their referrals actually deposit
       
       toast({ 
         title: "Registration successful!", 
         description: referrerId
-          ? "Your referral was applied and your ₦300 welcome bonus has been added."
+          ? "Your referral was applied! Your ₦300 welcome bonus has been added. Referral bonuses will be paid when you make your first deposit."
           : "Welcome bonus of ₦300 has been added to your account!"
       });
       router.push("/dashboard");

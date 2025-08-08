@@ -179,8 +179,8 @@ export default function SharePage() {
                 <Award size={28} className="text-yellow-400" />
             </div>
             <div>
-              <p className="text-lg font-bold text-yellow-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 24% Commission</p>
-              <p className="text-sm text-muted-foreground">Level 1 Referrals</p>
+              <p className="text-lg font-bold text-yellow-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 24% + 5% Commission</p>
+              <p className="text-sm text-muted-foreground">Level 1 Referrals (First Deposit)</p>
             </div>
           </CardContent>
         </Card>
@@ -191,7 +191,7 @@ export default function SharePage() {
             </div>
             <div>
                <p className="text-lg font-bold text-slate-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 3% Commission</p>
-               <p className="text-sm text-muted-foreground">Level 2 Referrals</p>
+               <p className="text-sm text-muted-foreground">Level 2 Referrals (On Deposit)</p>
             </div>
           </CardContent>
         </Card>
@@ -202,7 +202,7 @@ export default function SharePage() {
             </div>
             <div>
                <p className="text-lg font-bold text-amber-600 flex items-center gap-1"><Star size={16} fill="currentColor"/> 2% Commission</p>
-               <p className="text-sm text-muted-foreground">Level 3 Referrals</p>
+               <p className="text-sm text-muted-foreground">Level 3 Referrals (On Deposit)</p>
             </div>
           </CardContent>
         </Card>

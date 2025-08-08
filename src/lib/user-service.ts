@@ -1193,7 +1193,7 @@ export class ReferralService {
     }
   }
 
-  // Process referral bonus
+  // Process referral bonus (now only called when user makes first deposit)
   static async processReferralBonus(newUserId: string, referrerId: string): Promise<void> {
     if (!isClientSide()) {
       console.warn('Firebase not initialized on server, cannot process referral bonus');
@@ -1234,7 +1234,7 @@ export class ReferralService {
           amount: referralBonus,
           status: 'Completed',
           date: new Date().toISOString(),
-          description: `Referral bonus for new user registration`,
+          description: `Referral bonus for user's first deposit`,
           referralUserId: newUserId
         });
       } catch (error) {
@@ -1246,7 +1246,7 @@ export class ReferralService {
       try {
         await NotificationService.createNotification({
           userId: referrerId,
-          message: `You earned ₦${referralBonus} referral bonus! A new user registered using your code.`,
+          message: `You earned ₦${referralBonus} referral bonus! Your referred user made their first deposit.`,
           date: new Date().toISOString(),
           read: false,
           type: 'referral'
@@ -1259,7 +1259,7 @@ export class ReferralService {
       // Create admin notification
       try {
         await AdminNotificationService.createAdminNotification({
-          message: `Referral bonus paid: ₦${referralBonus} to ${referrer.email} for new user registration`,
+          message: `Referral bonus paid: ₦${referralBonus} to ${referrer.email} for user's first deposit`,
           date: new Date().toISOString(),
           read: false,
           type: 'system'
@@ -1275,7 +1275,7 @@ export class ReferralService {
     }
   }
 
-  // Process deposit referral bonus
+  // Process deposit referral bonus with multi-level support
   static async processDepositReferralBonus(userId: string, depositAmount: number): Promise<void> {
     if (!isClientSide()) {
       console.warn('Firebase not initialized on server, cannot process deposit referral bonus');
@@ -1285,18 +1285,34 @@ export class ReferralService {
       const user = await UserService.getUserById(userId);
       if (!user || !user.referredBy) return;
 
-      const referrer = await UserService.getUserById(user.referredBy);
-      if (!referrer) return;
+      // Process level 1 referral (direct referrer)
+      await this.processLevel1ReferralBonus(user, depositAmount);
+      
+      // Process level 2 referral (referrer's referrer)
+      await this.processLevel2ReferralBonus(user, depositAmount);
+      
+      // Process level 3 referral (referrer's referrer's referrer)
+      await this.processLevel3ReferralBonus(user, depositAmount);
+      
+    } catch (error) {
+      console.error('Error processing deposit referral bonus:', error);
+      throw error;
+    }
+  }
 
-      // Check if this is the user's first deposit
-      const isFirstDeposit = !user.hasDeposited;
+  // Process level 1 referral bonus (24% of welcome bonus for first deposit, 5% of deposit amount)
+  private static async processLevel1ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
+    const referrer = await UserService.getUserById(user.referredBy!);
+    if (!referrer) return;
 
-      // Calculate bonuses
-      const depositBonus = Math.round(depositAmount * 0.05); // 5% of deposit amount
-      const registrationBonus = isFirstDeposit ? Math.round(550 * 0.24) : 0; // 24% of welcome bonus for first deposit
-      const totalBonus = depositBonus + registrationBonus;
+    const isFirstDeposit = !user.hasDeposited;
+    const welcomeBonus = 300;
+    const registrationBonus = isFirstDeposit ? Math.round(welcomeBonus * 0.24) : 0; // 24% of welcome bonus
+    const depositBonus = Math.round(depositAmount * 0.05); // 5% of deposit amount
+    const totalBonus = registrationBonus + depositBonus;
 
-      // Update referrer's balance and referral stats
+    if (totalBonus > 0) {
+      // Update referrer's balance and stats
       const updatedReferrer = {
         ...referrer,
         balance: (referrer.balance || 0) + totalBonus,
@@ -1304,7 +1320,7 @@ export class ReferralService {
       };
       await UserService.saveUser(updatedReferrer);
 
-      // Create transaction for referrer
+      // Create transaction
       await TransactionService.createTransaction({
         userId: referrer.id,
         userEmail: referrer.email,
@@ -1313,15 +1329,15 @@ export class ReferralService {
         status: 'Completed',
         date: new Date().toISOString(),
         description: isFirstDeposit 
-          ? `Referral bonus for user's first deposit (Registration + Deposit bonus)`
-          : `Referral bonus for user deposit`,
-        referralUserId: userId
+          ? `Level 1 referral bonus for first deposit (Registration + Deposit bonus)`
+          : `Level 1 referral bonus for deposit`,
+        referralUserId: user.id
       });
 
-      // Create notification for referrer
+      // Create notification
       const bonusMessage = isFirstDeposit 
-        ? `You earned ₦${totalBonus} referral bonus! Your referred user made their first deposit (Registration + Deposit bonus).`
-        : `You earned ₦${totalBonus} referral bonus! Your referred user made a deposit.`;
+        ? `You earned ₦${totalBonus} Level 1 referral bonus! Your referred user made their first deposit.`
+        : `You earned ₦${totalBonus} Level 1 referral bonus! Your referred user made a deposit.`;
       
       await NotificationService.createNotification({
         userId: referrer.id,
@@ -1330,17 +1346,93 @@ export class ReferralService {
         read: false,
         type: 'referral'
       });
+    }
+  }
 
-      // Create admin notification
-      await AdminNotificationService.createAdminNotification({
-        message: `Referral bonus paid: ₦${totalBonus} to ${referrer.email} for user ${user.email} ${isFirstDeposit ? 'first deposit' : 'deposit'}`,
+  // Process level 2 referral bonus (3% of deposit amount)
+  private static async processLevel2ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
+    const level1Referrer = await UserService.getUserById(user.referredBy!);
+    if (!level1Referrer || !level1Referrer.referredBy) return;
+
+    const level2Referrer = await UserService.getUserById(level1Referrer.referredBy);
+    if (!level2Referrer) return;
+
+    const level2Bonus = Math.round(depositAmount * 0.03); // 3% of deposit amount
+
+    if (level2Bonus > 0) {
+      // Update level 2 referrer's balance
+      const updatedLevel2Referrer = {
+        ...level2Referrer,
+        balance: (level2Referrer.balance || 0) + level2Bonus,
+        referralEarnings: (level2Referrer.referralEarnings || 0) + level2Bonus
+      };
+      await UserService.saveUser(updatedLevel2Referrer);
+
+      // Create transaction
+      await TransactionService.createTransaction({
+        userId: level2Referrer.id,
+        userEmail: level2Referrer.email,
+        type: 'Referral_Bonus',
+        amount: level2Bonus,
+        status: 'Completed',
+        date: new Date().toISOString(),
+        description: `Level 2 referral bonus for user deposit`,
+        referralUserId: user.id
+      });
+
+      // Create notification
+      await NotificationService.createNotification({
+        userId: level2Referrer.id,
+        message: `You earned ₦${level2Bonus} Level 2 referral bonus! Your level 2 referred user made a deposit.`,
         date: new Date().toISOString(),
         read: false,
-        type: 'system'
+        type: 'referral'
       });
-    } catch (error) {
-      console.error('Error processing deposit referral bonus:', error);
-      throw error;
+    }
+  }
+
+  // Process level 3 referral bonus (2% of deposit amount)
+  private static async processLevel3ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
+    const level1Referrer = await UserService.getUserById(user.referredBy!);
+    if (!level1Referrer || !level1Referrer.referredBy) return;
+
+    const level2Referrer = await UserService.getUserById(level1Referrer.referredBy);
+    if (!level2Referrer || !level2Referrer.referredBy) return;
+
+    const level3Referrer = await UserService.getUserById(level2Referrer.referredBy);
+    if (!level3Referrer) return;
+
+    const level3Bonus = Math.round(depositAmount * 0.02); // 2% of deposit amount
+
+    if (level3Bonus > 0) {
+      // Update level 3 referrer's balance
+      const updatedLevel3Referrer = {
+        ...level3Referrer,
+        balance: (level3Referrer.balance || 0) + level3Bonus,
+        referralEarnings: (level3Referrer.referralEarnings || 0) + level3Bonus
+      };
+      await UserService.saveUser(updatedLevel3Referrer);
+
+      // Create transaction
+      await TransactionService.createTransaction({
+        userId: level3Referrer.id,
+        userEmail: level3Referrer.email,
+        type: 'Referral_Bonus',
+        amount: level3Bonus,
+        status: 'Completed',
+        date: new Date().toISOString(),
+        description: `Level 3 referral bonus for user deposit`,
+        referralUserId: user.id
+      });
+
+      // Create notification
+      await NotificationService.createNotification({
+        userId: level3Referrer.id,
+        message: `You earned ₦${level3Bonus} Level 3 referral bonus! Your level 3 referred user made a deposit.`,
+        date: new Date().toISOString(),
+        read: false,
+        type: 'referral'
+      });
     }
   }
 
