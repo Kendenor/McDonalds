@@ -27,6 +27,8 @@ export interface AppSettings {
   whatsappLink: string;
   infoItems: Array<{ text: string }>;
   bankAccounts: BankAccount[];
+  minDeposit?: number;
+  maxDeposit?: number;
   updatedAt?: any;
 }
 

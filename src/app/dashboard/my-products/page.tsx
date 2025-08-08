@@ -21,8 +21,40 @@ function PurchasedProductCard({
   onClaim: (productId: string, dailyEarning: number) => void;
   claimedToday: boolean;
 }) {
-  const { name, imageUrl, dailyEarning, totalEarning, daysCompleted, totalDays, id } = product;
+  const { name, imageUrl, dailyEarning, totalEarning, daysCompleted, totalDays, id, planType, isLocked, endDate } = product;
   const progress = (daysCompleted / totalDays) * 100;
+  
+  // Calculate if product is locked (Basic and Premium should be locked until cycle ends)
+  const isProductLocked = (planType === 'Basic' || planType === 'Premium') && isLocked;
+  
+  // Calculate remaining time for countdown
+  const [timeRemaining, setTimeRemaining] = useState<string>('');
+  
+  useEffect(() => {
+    if (!isProductLocked) return;
+    
+    const updateCountdown = () => {
+      const now = new Date();
+      const end = new Date(endDate);
+      const diff = end.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setTimeRemaining('Unlocked');
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      setTimeRemaining(`${days}d ${hours}h ${minutes}m`);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [isProductLocked, endDate]);
 
   return (
     <Card className="bg-card/50 overflow-hidden rounded-2xl w-full">
@@ -59,13 +91,28 @@ function PurchasedProductCard({
                 <Progress value={progress} className="h-2" />
             </div>
 
-            <Button 
-              className="w-full bg-primary/20 hover:bg-primary/30 text-primary font-bold disabled:bg-green-500/20 disabled:text-green-400 disabled:cursor-not-allowed" 
-              onClick={() => onClaim(id, dailyEarning)}
-              disabled={claimedToday}
-            >
-              {claimedToday ? <><CheckCircle className="mr-2"/> Claimed</> : "Claim Earnings"}
-            </Button>
+            {isProductLocked ? (
+              <div className="space-y-2">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 text-center">
+                  <p className="text-sm text-orange-400 font-medium">🔒 Product Locked</p>
+                  <p className="text-xs text-orange-300">Unlocks in: {timeRemaining}</p>
+                </div>
+                <Button 
+                  className="w-full bg-gray-500/20 text-gray-400 cursor-not-allowed" 
+                  disabled={true}
+                >
+                  Locked Until Cycle Ends
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                className="w-full bg-primary/20 hover:bg-primary/30 text-primary font-bold disabled:bg-green-500/20 disabled:text-green-400 disabled:cursor-not-allowed" 
+                onClick={() => onClaim(id, dailyEarning)}
+                disabled={claimedToday}
+              >
+                {claimedToday ? <><CheckCircle className="mr-2"/> Claimed</> : "Claim Earnings"}
+              </Button>
+            )}
       </div>
     </Card>
   );

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, User, Lock } from 'lucide-react';
+import { AppLoader } from '@/components/ui/app-loader';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -131,7 +132,7 @@ export default function LoginClient() {
               </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading ? <AppLoader size="sm" text="Logging in..." /> : 'Login'}
             </Button>
           </form>
           <div className="mt-6 text-center">

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { User, Lock, Eye, EyeOff, Ticket, Loader } from 'lucide-react';
+import { AppLoader } from '@/components/ui/app-loader';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
@@ -201,7 +202,7 @@ export default function RegisterClient() {
               </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base" disabled={isLoading}>
-              {isLoading ? 'Registering...' : 'Register'}
+              {isLoading ? <AppLoader size="sm" text="Registering..." /> : 'Register'}
             </Button>
           </form>
         </CardContent>

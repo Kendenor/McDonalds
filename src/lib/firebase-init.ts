@@ -1,102 +1,43 @@
-import { db } from './firebase';
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+// Dynamic Firebase initialization for client-side only
+let firebaseApp: any = null;
+let firebaseAuth: any = null;
+let firebaseDb: any = null;
 
-export class FirebaseInit {
-  static async testConnection() {
-    try {
-      console.log('🔍 Testing Firebase connection...');
-      
-      // Test write
-      const testDoc = doc(db, 'system', 'connection_test');
-      await setDoc(testDoc, { 
-        test: true, 
-        timestamp: new Date().toISOString(),
-        message: 'Firebase connection test'
-      });
-      console.log('✅ Firebase write test passed');
-      
-      // Test read
-      const testRead = await getDoc(testDoc);
-      if (testRead.exists()) {
-        console.log('✅ Firebase read test passed:', testRead.data());
-      } else {
-        throw new Error('Document not found after write');
-      }
-      
-      // Test delete
-      await deleteDoc(testDoc);
-      console.log('✅ Firebase delete test passed');
-      
-      return { success: true, message: 'Firebase connection working perfectly' };
-    } catch (error: any) {
-      console.error('❌ Firebase connection test failed:', error);
-      return { 
-        success: false, 
-        error: error.message,
-        code: error.code 
-      };
-    }
+export async function initializeFirebase() {
+  if (typeof window === 'undefined') {
+    return { app: null, auth: null, db: null };
   }
 
-  static async initializeDefaultData() {
-    try {
-      console.log('🚀 Initializing default Firebase data...');
-      
-      // Check if already initialized
-      const initDoc = doc(db, 'system', 'initialized');
-      const initCheck = await getDoc(initDoc);
-      
-      if (initCheck.exists()) {
-        console.log('✅ Firebase already initialized');
-        return { success: true, message: 'Already initialized' };
-      }
-      
-      // Create default settings
-      const defaultSettings = {
-        telegramLink: 'https://t.me/mcdonaldsgroup',
-        whatsappLink: 'https://whatsapp.com/channel/mcdonalds',
-        infoItems: [
-          { text: "Profit drops every 24 hours" },
-          { text: "Level 1 - 24% Level 2 - 3% Level 3 - 2%" },
-          { text: "Withdrawal: 10am - 6pm daily" },
-          { text: "Deposit: 24/7" },
-          { text: "Daily Login bonus: ₦50" },
-          { text: "Welcome bonus: ₦550" },
-          { text: "Minimum deposit: ₦3,000" },
-          { text: "Withdrawal charge: 15%" },
-          { text: "Minimum withdrawal: ₦1,000" },
-        ],
-        bankAccounts: [
-          {
-            id: 'default-1',
-            bankName: 'Access Bank',
-            accountNumber: '1234567890',
-            accountName: 'McDonald Investment Ltd'
-          }
-        ]
-      };
-      
-      // Save default settings
-      await setDoc(doc(db, 'settings', 'app_settings'), {
-        ...defaultSettings,
-        createdAt: new Date().toISOString()
-      });
-      
-      // Mark as initialized
-      await setDoc(initDoc, {
-        initialized: true,
-        date: new Date().toISOString()
-      });
-      
-      console.log('✅ Firebase initialized with default data');
-      return { success: true, message: 'Firebase initialized successfully' };
-      
-    } catch (error: any) {
-      console.error('❌ Firebase initialization failed:', error);
-      return { 
-        success: false, 
-        error: error.message 
-      };
-    }
+  if (firebaseApp) {
+    return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
   }
+
+  try {
+    const { initializeApp, getApps, getApp } = await import('firebase/app');
+    const { getAuth } = await import('firebase/auth');
+    const { getFirestore } = await import('firebase/firestore');
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD3G2Dkn0s611TUM9zGM_1CqjW1RFkUm1Q",
+      authDomain: "hapy-474ab.firebaseapp.com",
+      projectId: "hapy-474ab",
+      storageBucket: "hapy-474ab.firebasestorage.app",
+      messagingSenderId: "374678558234",
+      appId: "1:374678558234:web:9929e563b5dd33459fa3a3",
+      measurementId: "G-ZMF627YT28"
+    };
+
+    firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    firebaseAuth = getAuth(firebaseApp);
+    firebaseDb = getFirestore(firebaseApp);
+
+    return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
+  } catch (error) {
+    console.error('Failed to initialize Firebase:', error);
+    return { app: null, auth: null, db: null };
+  }
+}
+
+export function getFirebase() {
+  return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
 } 

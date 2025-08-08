@@ -35,6 +35,8 @@ export default function SettingsPage() {
     const [whatsappLink, setWhatsappLink] = useState('')
     const [infoItems, setInfoItems] = useState<InfoItem[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [minDeposit, setMinDeposit] = useState(3000);
+    const [maxDeposit, setMaxDeposit] = useState(500000);
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
@@ -45,6 +47,8 @@ export default function SettingsPage() {
                 setWhatsappLink(settings.whatsappLink || '');
                 setInfoItems(settings.infoItems && settings.infoItems.length > 0 ? settings.infoItems : defaultInfoItems);
                 setBankAccounts(settings.bankAccounts || []);
+                setMinDeposit(settings.minDeposit || 3000);
+                setMaxDeposit(settings.maxDeposit || 500000);
             } catch (error) {
                 console.error('Error loading settings:', error);
                 toast({ variant: 'destructive', title: 'Error', description: 'Failed to load settings from database.' });
@@ -90,7 +94,9 @@ export default function SettingsPage() {
                 telegramLink, 
                 whatsappLink, 
                 infoItems, 
-                bankAccounts 
+                bankAccounts,
+                minDeposit,
+                maxDeposit
             };
             
             // Save to Firebase
@@ -103,7 +109,7 @@ export default function SettingsPage() {
             toast({ title: 'Success', description: 'Settings saved to Firebase successfully.' });
         } catch (error: any) {
             // Fallback to localStorage only
-            const settings = { telegramLink, whatsappLink, infoItems, bankAccounts };
+            const settings = { telegramLink, whatsappLink, infoItems, bankAccounts, minDeposit, maxDeposit };
             localStorage.setItem('globalSettings', JSON.stringify(settings));
             toast({ 
                 title: 'Firebase Error', 
@@ -133,6 +139,32 @@ export default function SettingsPage() {
                          <div className="space-y-2">
                             <Label htmlFor="whatsapp">WhatsApp Channel Link</Label>
                             <Input id="whatsapp" value={whatsappLink} onChange={(e) => setWhatsappLink(e.target.value)} placeholder="https://whatsapp.com/channel/yourchannel" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Deposit Limits</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="minDeposit">Minimum Deposit (₦)</Label>
+                                <Input 
+                                    id="minDeposit" 
+                                    type="number" 
+                                    value={minDeposit} 
+                                    onChange={(e) => setMinDeposit(Number(e.target.value))} 
+                                    placeholder="3000" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="maxDeposit">Maximum Deposit (₦)</Label>
+                                <Input 
+                                    id="maxDeposit" 
+                                    type="number" 
+                                    value={maxDeposit} 
+                                    onChange={(e) => setMaxDeposit(Number(e.target.value))} 
+                                    placeholder="500000" 
+                                />
+                            </div>
                         </div>
                     </div>
 

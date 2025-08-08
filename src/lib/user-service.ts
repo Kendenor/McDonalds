@@ -15,6 +15,11 @@ import {
   getDocs 
 } from 'firebase/firestore';
 
+// Helper function to check if we're on client side
+function isClientSide() {
+  return typeof window !== 'undefined';
+}
+
 export interface AppUser {
   id: string;
   email: string;
@@ -114,6 +119,10 @@ export class UserService {
 
   // Get all users
   static async getAllUsers(): Promise<AppUser[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning empty array');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), orderBy('regDate', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -129,6 +138,10 @@ export class UserService {
 
   // Get user by ID
   static async getUserById(userId: string): Promise<AppUser | null> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning null');
+      return null;
+    }
     try {
       const userDoc = await getDoc(doc(db, this.COLLECTION, userId));
       if (userDoc.exists()) {
@@ -143,6 +156,10 @@ export class UserService {
 
   // Create or update user
   static async saveUser(user: AppUser): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot save user');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const userDoc = doc(db, this.COLLECTION, user.id);
       await setDoc(userDoc, {
@@ -157,6 +174,10 @@ export class UserService {
 
   // Update user status
   static async updateUserStatus(userId: string, status: 'Active' | 'Suspended'): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update user status');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const userDoc = doc(db, this.COLLECTION, userId);
       await updateDoc(userDoc, {
@@ -171,6 +192,10 @@ export class UserService {
 
   // Listen to users changes
   static onUsersChange(callback: (users: AppUser[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to users changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), orderBy('regDate', 'desc'));
     return onSnapshot(q, (querySnapshot) => {
       const users = querySnapshot.docs.map(doc => ({
@@ -188,6 +213,10 @@ export class TransactionService {
 
   // Get all transactions
   static async getAllTransactions(): Promise<Transaction[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning empty array');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -203,6 +232,10 @@ export class TransactionService {
 
   // Get transactions by user
   static async getTransactionsByUser(userId: string): Promise<Transaction[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning empty array');
+      return [];
+    }
     try {
       const q = query(
         collection(db, this.COLLECTION), 
@@ -220,6 +253,10 @@ export class TransactionService {
 
   // Create transaction
   static async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot create transaction');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...transaction,
@@ -234,6 +271,10 @@ export class TransactionService {
 
   // Update transaction status
   static async updateTransactionStatus(transactionId: string, status: 'Completed' | 'Pending' | 'Failed'): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update transaction status');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const transactionDoc = doc(db, this.COLLECTION, transactionId);
       await updateDoc(transactionDoc, {
@@ -248,6 +289,10 @@ export class TransactionService {
 
   // Listen to transactions changes
   static onTransactionsChange(callback: (transactions: Transaction[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to transactions changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
     return onSnapshot(q, (querySnapshot) => {
       const transactions = querySnapshot.docs.map(doc => ({
@@ -265,6 +310,10 @@ export class ProductService {
 
   // Get user's purchased products
   static async getUserProducts(userId: string): Promise<PurchasedProduct[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning empty array');
+      return [];
+    }
     try {
       const q = query(
         collection(db, this.COLLECTION), 
@@ -282,6 +331,10 @@ export class ProductService {
 
   // Add purchased product
   static async addPurchasedProduct(product: Omit<PurchasedProduct, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot add purchased product');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...product,
@@ -296,6 +349,10 @@ export class ProductService {
 
   // Get all active products (for daily payout processing)
   static async getAllActiveProducts(): Promise<PurchasedProduct[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning empty array');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), where('status', '==', 'Active'));
       const querySnapshot = await getDocs(q);
@@ -311,6 +368,10 @@ export class ProductService {
 
   // Update product progress
   static async updateProductProgress(productId: string, daysCompleted: number): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update product progress');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const productDoc = doc(db, this.COLLECTION, productId);
       await updateDoc(productDoc, {
@@ -326,6 +387,10 @@ export class ProductService {
 
   // Update product status
   static async updateProductStatus(productId: string, status: 'Active' | 'Completed'): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update product status');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const productDoc = doc(db, this.COLLECTION, productId);
       await updateDoc(productDoc, {
@@ -340,6 +405,10 @@ export class ProductService {
 
   // Update product payout date
   static async updateProductPayoutDate(productId: string, payoutDate: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update product payout date');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const productDoc = doc(db, this.COLLECTION, productId);
       await updateDoc(productDoc, {
@@ -354,6 +423,10 @@ export class ProductService {
 
   // Listen to user products changes
   static onUserProductsChange(userId: string, callback: (products: PurchasedProduct[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to user products changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), orderBy('purchaseDate', 'desc'));
     return onSnapshot(q, (querySnapshot) => {
       const products = querySnapshot.docs
@@ -365,6 +438,10 @@ export class ProductService {
 
   // Check and reset expired products
   static async checkAndResetExpiredProducts(): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot check and reset expired products');
+      return;
+    }
     try {
       const allProducts = await this.getAllActiveProducts();
       
@@ -390,6 +467,10 @@ export class ProductService {
 
   // Get user's active products with remaining time
   static async getUserActiveProducts(userId: string): Promise<PurchasedProduct[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get user active products');
+      return [];
+    }
     try {
       const userProducts = await this.getUserProducts(userId);
       const now = new Date();
@@ -413,6 +494,10 @@ export class ClaimService {
 
   // Get user's claims for a specific date
   static async getUserClaimsForDate(userId: string, dateKey: string): Promise<Claim[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get user claims');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION));
       const querySnapshot = await getDocs(q);
@@ -427,6 +512,10 @@ export class ClaimService {
 
   // Add claim
   static async addClaim(claim: Omit<Claim, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot add claim');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...claim,
@@ -441,6 +530,10 @@ export class ClaimService {
 
   // Check if user has claimed for a product today
   static async hasClaimedToday(userId: string, productId: string): Promise<boolean> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot check claim status');
+      return false;
+    }
     try {
       const today = new Date().toISOString().split('T')[0];
       const claims = await this.getUserClaimsForDate(userId, today);
@@ -458,6 +551,10 @@ export class AnnouncementService {
 
   // Get all active announcements
   static async getActiveAnnouncements(): Promise<Announcement[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get announcements');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -472,6 +569,10 @@ export class AnnouncementService {
 
   // Add announcement
   static async addAnnouncement(announcement: Omit<Announcement, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot add announcement');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...announcement,
@@ -486,6 +587,10 @@ export class AnnouncementService {
 
   // Update announcement
   static async updateAnnouncement(id: string, announcement: Partial<Announcement>): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update announcement');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const announcementDoc = doc(db, this.COLLECTION, id);
       await updateDoc(announcementDoc, {
@@ -500,6 +605,10 @@ export class AnnouncementService {
 
   // Delete announcement
   static async deleteAnnouncement(id: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot delete announcement');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const announcementDoc = doc(db, this.COLLECTION, id);
       await deleteDoc(announcementDoc);
@@ -511,6 +620,10 @@ export class AnnouncementService {
 
   // Listen to announcements changes
   static onAnnouncementsChange(callback: (announcements: Announcement[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to announcements changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
     return onSnapshot(q, (querySnapshot) => {
       const announcements = querySnapshot.docs
@@ -527,6 +640,10 @@ export class NotificationService {
 
   // Create notification
   static async createNotification(notification: Omit<Notification, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot create notification');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...notification,
@@ -541,6 +658,10 @@ export class NotificationService {
 
   // Get user notifications
   static async getUserNotifications(userId: string): Promise<Notification[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get user notifications');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
@@ -556,6 +677,10 @@ export class NotificationService {
 
   // Mark notification as read
   static async markAsRead(notificationId: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot mark notification as read');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const notificationDoc = doc(db, this.COLLECTION, notificationId);
       await updateDoc(notificationDoc, {
@@ -570,6 +695,10 @@ export class NotificationService {
 
   // Delete notification
   static async deleteNotification(notificationId: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot delete notification');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const notificationDoc = doc(db, this.COLLECTION, notificationId);
       await deleteDoc(notificationDoc);
@@ -581,6 +710,10 @@ export class NotificationService {
 
   // Listen to user notifications
   static onUserNotificationsChange(userId: string, callback: (notifications: Notification[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to user notifications changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), where('userId', '==', userId));
     return onSnapshot(q, (querySnapshot) => {
       const notifications = querySnapshot.docs.map(doc => ({
@@ -600,6 +733,10 @@ export class AdminNotificationService {
 
   // Create admin notification
   static async createAdminNotification(notification: Omit<AdminNotification, 'id'>): Promise<string> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot create admin notification');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...notification,
@@ -614,6 +751,10 @@ export class AdminNotificationService {
 
   // Get all admin notifications
   static async getAdminNotifications(): Promise<AdminNotification[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get admin notifications');
+      return [];
+    }
     try {
       const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -629,6 +770,10 @@ export class AdminNotificationService {
 
   // Mark admin notification as read
   static async markAsRead(notificationId: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot mark admin notification as read');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const notificationDoc = doc(db, this.COLLECTION, notificationId);
       await updateDoc(notificationDoc, {
@@ -643,6 +788,10 @@ export class AdminNotificationService {
 
   // Delete admin notification
   static async deleteAdminNotification(notificationId: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot delete admin notification');
+      throw new Error('Firebase not initialized');
+    }
     try {
       const notificationDoc = doc(db, this.COLLECTION, notificationId);
       await deleteDoc(notificationDoc);
@@ -654,6 +803,10 @@ export class AdminNotificationService {
 
   // Listen to admin notifications changes
   static onAdminNotificationsChange(callback: (notifications: AdminNotification[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to admin notifications changes');
+      return;
+    }
     const q = query(collection(db, this.COLLECTION), orderBy('date', 'desc'));
     return onSnapshot(q, (querySnapshot) => {
       const notifications = querySnapshot.docs.map(doc => ({
@@ -671,6 +824,17 @@ export class AdminNotificationService {
 export class DataService {
   // Get aggregated data for admin dashboard
   static async getDashboardData() {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning default dashboard data');
+      return {
+        totalUsers: 0,
+        totalDeposits: 0,
+        totalWithdrawals: 0,
+        pendingApprovals: 0,
+        recentTransactions: [],
+        recentUsers: []
+      };
+    }
     try {
       const users = await UserService.getAllUsers();
       const transactions = await TransactionService.getAllTransactions();
@@ -705,6 +869,10 @@ export class DataService {
 
   // Initialize default data
   static async initializeDefaultData() {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot initialize default data');
+      return;
+    }
     try {
       // Check if data already exists
       const usersDoc = await getDoc(doc(db, 'data', 'initialized'));
@@ -834,6 +1002,10 @@ export class InvestmentPlanService {
 
   // Check if user can access Special/Premium plans
   static async canAccessSpecialPlans(userId: string): Promise<boolean> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot check special plan access');
+      return false;
+    }
     try {
       const userProducts = await ProductService.getUserProducts(userId);
       return userProducts.some(product => product.planType === 'Basic' && product.status === 'Active');
@@ -845,6 +1017,10 @@ export class InvestmentPlanService {
 
   // Process daily payouts for all active plans
   static async processDailyPayouts(): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot process daily payouts');
+      return;
+    }
     try {
       const allProducts = await ProductService.getAllActiveProducts();
       
@@ -871,6 +1047,10 @@ export class InvestmentPlanService {
 
   // Process daily payout for a specific plan
   private static async processDailyPayout(product: PurchasedProduct): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot process daily payout');
+      return;
+    }
     const now = new Date();
     const lastPayout = product.lastPayoutDate ? new Date(product.lastPayoutDate) : new Date(product.startDate);
     const daysSinceLastPayout = Math.floor((now.getTime() - lastPayout.getTime()) / (1000 * 60 * 60 * 24));
@@ -902,6 +1082,10 @@ export class InvestmentPlanService {
 
   // Complete a plan cycle
   private static async completePlan(product: PurchasedProduct): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot complete plan');
+      return;
+    }
     const now = new Date();
     let finalPayout = 0;
     
@@ -936,6 +1120,10 @@ export class InvestmentPlanService {
 
   // Add amount to user's main balance
   private static async addToUserBalance(userId: string, amount: number): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot update user balance');
+      return;
+    }
     try {
       const user = await UserService.getUserById(userId);
       if (user) {
@@ -953,12 +1141,20 @@ export class ReferralService {
 
   // Generate referral code
   static generateReferralCode(): string {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot generate referral code');
+      return '';
+    }
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     return code;
   }
 
   // Get user by referral code
   static async getUserByReferralCode(referralCode: string): Promise<AppUser | null> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, returning null');
+      return null;
+    }
     try {
       const q = query(collection(db, 'users'), where('referralCode', '==', referralCode));
       const querySnapshot = await getDocs(q);
@@ -976,6 +1172,10 @@ export class ReferralService {
 
   // Process referral bonus
   static async processReferralBonus(newUserId: string, referrerId: string): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot process referral bonus');
+      return;
+    }
     try {
       // Get referrer user
       const referrer = await UserService.getUserById(referrerId);
@@ -1054,6 +1254,10 @@ export class ReferralService {
 
   // Process deposit referral bonus
   static async processDepositReferralBonus(userId: string, depositAmount: number): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot process deposit referral bonus');
+      return;
+    }
     try {
       const user = await UserService.getUserById(userId);
       if (!user || !user.referredBy) return;
@@ -1123,6 +1327,10 @@ export class ReferralService {
     level2: AppUser[];
     level3: AppUser[];
   }> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get referral tree');
+      return { level1: [], level2: [], level3: [] };
+    }
     try {
       const level1 = await this.getDirectReferrals(userId);
       const level2: AppUser[] = [];
@@ -1149,6 +1357,10 @@ export class ReferralService {
 
   // Get direct referrals
   private static async getDirectReferrals(userId: string): Promise<AppUser[]> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get direct referrals');
+      return [];
+    }
     try {
       const q = query(collection(db, 'users'), where('referredBy', '==', userId));
       const querySnapshot = await getDocs(q);
@@ -1171,6 +1383,10 @@ export class ReferralService {
     referralsWithDeposits: number;
     referralsWithoutDeposits: number;
   }> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot get referral details');
+      return { referrals: [], totalReferrals: 0, totalEarnings: 0, referralsWithDeposits: 0, referralsWithoutDeposits: 0 };
+    }
     try {
       const referrals = await this.getDirectReferrals(userId);
       const totalEarnings = referrals.reduce((sum, user) => sum + (user.referralEarnings || 0), 0);

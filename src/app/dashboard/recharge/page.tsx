@@ -1,19 +1,35 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Banknote, AlertCircle, ArrowRight, Loader } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { SettingsService } from '@/lib/firebase-service';
 
 export default function RechargePage() {
     const { toast } = useToast();
     const router = useRouter();
     const [amount, setAmount] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [minDeposit, setMinDeposit] = useState(3000);
+    const [maxDeposit, setMaxDeposit] = useState(500000);
     const quickAmounts = [3000, 5000, 10000, 30000, 80000, 150000, 400000, 650000];
+
+    useEffect(() => {
+        const loadDepositLimits = async () => {
+            try {
+                const settings = await SettingsService.getSettings();
+                setMinDeposit(settings.minDeposit || 3000);
+                setMaxDeposit(settings.maxDeposit || 500000);
+            } catch (error) {
+                console.error('Error loading deposit limits:', error);
+            }
+        };
+        loadDepositLimits();
+    }, []);
 
     const handleQuickAmountClick = (quickAmount: number) => {
         setAmount(quickAmount.toString());
@@ -21,8 +37,18 @@ export default function RechargePage() {
 
     const handleProceed = () => {
         const depositAmount = parseFloat(amount);
-        if (isNaN(depositAmount) || depositAmount < 3000) {
-            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Minimum recharge amount is ₦3,000.' });
+        if (isNaN(depositAmount)) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid amount.' });
+            return;
+        }
+        
+        if (depositAmount < minDeposit) {
+            toast({ variant: 'destructive', title: 'Amount Too Low', description: `Minimum recharge amount is ₦${minDeposit.toLocaleString()}.` });
+            return;
+        }
+        
+        if (depositAmount > maxDeposit) {
+            toast({ variant: 'destructive', title: 'Amount Too High', description: `Maximum recharge amount is ₦${maxDeposit.toLocaleString()}.` });
             return;
         }
 
@@ -41,8 +67,8 @@ export default function RechargePage() {
             <div className="bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground p-4 rounded-lg flex items-center gap-3">
                 <AlertCircle />
                 <div>
-                    <p className="text-sm">Minimum Recharge Amount:</p>
-                    <p className="font-bold text-lg">₦3,000</p>
+                    <p className="text-sm">Deposit Limits:</p>
+                    <p className="font-bold text-lg">₦{minDeposit.toLocaleString()} - ₦{maxDeposit.toLocaleString()}</p>
                 </div>
             </div>
 
