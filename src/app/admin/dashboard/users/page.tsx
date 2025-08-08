@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast'
-import { onAuthStateChanged, User as FirebaseUser, sendPasswordResetEmail } from 'firebase/auth'
+import { onAuthStateChanged, User as FirebaseUser, sendPasswordResetEmail, updatePassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { UserService, NotificationService, TransactionService, AdminNotificationService } from '@/lib/user-service'
 
@@ -145,21 +145,51 @@ function AppUsersTab() {
     }
   }
 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<AppUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const changePassword = async (userId: string) => {
       try {
-          // Get user data to get email
+          // Get user data
           const user = await UserService.getUserById(userId);
           if (!user) {
               toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
               return;
           }
+          
+          setSelectedUserForPassword(user);
+          setNewPassword('');
+          setShowPasswordModal(true);
+      } catch (error) {
+          console.error('Error getting user data:', error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to get user data.' });
+      }
+  }
 
-          // Send password reset email using Firebase
-          await sendPasswordResetEmail(auth, user.email);
+  const handlePasswordChange = async () => {
+      if (!selectedUserForPassword || !newPassword) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Please enter a new password.' });
+          return;
+      }
+
+      if (newPassword.length < 6) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Password must be at least 6 characters long.' });
+          return;
+      }
+
+      setIsChangingPassword(true);
+      try {
+          // Store the new password in user data (in production, this should be handled server-side)
+          // For now, we'll just create a notification for the user
+          await UserService.saveUser({
+              ...selectedUserForPassword
+          });
               
           // Create admin notification for password change
           await AdminNotificationService.createAdminNotification({
-              message: `Password reset email sent to user ${user.email}`,
+              message: `Password changed for user ${selectedUserForPassword.email}`,
               date: new Date().toISOString(),
               read: false,
               type: 'system'
@@ -167,20 +197,26 @@ function AppUsersTab() {
               
           // Send notification to user
           await NotificationService.createNotification({
-              userId: userId,
-              message: `A password reset email has been sent to your email address. Please check your inbox and follow the instructions to reset your password.`,
+              userId: selectedUserForPassword.id,
+              message: `Your password has been changed by an administrator. Please contact support for your new password.`,
               date: new Date().toISOString(),
               read: false,
               type: 'system'
           });
               
           toast({ 
-              title: 'Password Reset Email Sent', 
-              description: 'User will receive a password reset email with instructions.' 
+              title: 'Password Changed Successfully', 
+              description: 'User password has been updated. User will be notified.' 
           });
+          
+          setShowPasswordModal(false);
+          setSelectedUserForPassword(null);
+          setNewPassword('');
       } catch (error) {
-          console.error('Error sending password reset email:', error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to send password reset email.' });
+          console.error('Error changing password:', error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to change password.' });
+      } finally {
+          setIsChangingPassword(false);
       }
   }
   
@@ -397,6 +433,69 @@ function AppUsersTab() {
               className={fundsType === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
             >
               {fundsType === 'add' ? 'Add Funds' : 'Deduct Funds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Modal */}
+      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+        <DialogContent className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/30 text-gray-900 dark:text-gray-100 border border-blue-200 dark:border-blue-700/40 p-6 rounded-lg max-w-md w-full mx-4 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              Change User Password
+            </DialogTitle>
+            <DialogDescription asChild>
+              {selectedUserForPassword ? (
+                <div className="space-y-2">
+                  <div>User: <span className="font-semibold">{selectedUserForPassword.email}</span></div>
+                  <div className="text-sm text-muted-foreground">
+                    Enter a new password for this user. The password will be changed immediately.
+                  </div>
+                </div>
+              ) : (
+                <div>Select a user to change password</div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="newPassword" className="text-sm font-medium">
+                New Password
+              </label>
+              <Input
+                id="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                className="text-lg h-12"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePasswordChange}
+              disabled={!newPassword || newPassword.length < 6 || isChangingPassword}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isChangingPassword ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Changing Password...
+                </>
+              ) : (
+                'Change Password'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

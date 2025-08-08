@@ -146,7 +146,9 @@ export default function DepositsPage() {
             const updatedUser = {
               ...userData,
               balance: (userData.balance || 0) + transaction.amount,
-              totalDeposits: (userData.totalDeposits || 0) + transaction.amount
+              totalDeposits: (userData.totalDeposits || 0) + transaction.amount,
+              hasDeposited: true,
+              firstDepositDate: new Date().toISOString()
             };
             await UserService.saveUser(updatedUser);
             console.log('User balance updated successfully');
@@ -166,12 +168,6 @@ export default function DepositsPage() {
         // Process referral bonus for first deposit
         try {
           await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
-          
-          // Also process registration referral bonus if this is the user's first deposit
-          const userData = await UserService.getUserById(transaction.userId);
-          if (userData && userData.referredBy && !userData.hasDeposited) {
-            await ReferralService.processReferralBonus(transaction.userId, userData.referredBy);
-          }
         } catch (error) {
           console.error('Error processing referral bonus:', error);
         }
