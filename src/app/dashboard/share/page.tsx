@@ -65,6 +65,25 @@ export default function SharePage() {
         return () => unsubscribe();
     }, []);
 
+    // Add real-time listener for user data changes
+    useEffect(() => {
+        if (!user) return;
+        
+        const unsubscribe = UserService.onUsersChange((users) => {
+            const currentUser = users.find(u => u.id === user.uid);
+            if (currentUser) {
+                console.log('User data updated in real-time:', currentUser);
+                setUserData(currentUser);
+            }
+        });
+        
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
+    }, [user]);
+
     const inviteCode = useMemo(() => {
         if (!userData) return 'ABCDEF';
         return userData.referralCode || 'ABCDEF';
@@ -78,7 +97,6 @@ export default function SharePage() {
         if (!userData) return 0;
         return userData.referralEarnings || 0;
     }, [userData]);
-
 
     const handleCopy = (text: string, type: string) => {
         navigator.clipboard.writeText(text).then(() => {
