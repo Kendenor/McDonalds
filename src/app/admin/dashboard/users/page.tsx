@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle, Ticket } from "lucide-react"
+import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle, Ticket, RefreshCw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast'
 import { onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, updatePassword } from 'firebase/auth'
@@ -109,13 +109,45 @@ function AppUsersTab() {
   const ensureReferralCodes = async () => {
     try {
       await ReferralService.ensureAllUsersHaveReferralCodes();
-      toast({ title: 'Success', description: 'All users now have referral codes.' });
-      fetchUsers(); // Refresh the user list
+      toast({ title: 'Success', description: 'Referral codes ensured for all users.' });
     } catch (error) {
       console.error('Error ensuring referral codes:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to ensure referral codes.' });
     }
-  }
+  };
+
+  const resetHasDepositedForNonDepositors = async () => {
+    try {
+      const allUsers = await UserService.getAllUsers();
+      let updatedCount = 0;
+      
+      for (const user of allUsers) {
+        // Check if user has any completed deposits
+        const userTransactions = await TransactionService.getTransactionsByUser(user.id);
+        const hasCompletedDeposits = userTransactions.some(t => 
+          t.type === 'Deposit' && t.status === 'Completed'
+        );
+        
+        // If user has hasDeposited: true but no actual completed deposits, reset it
+        if (user.hasDeposited && !hasCompletedDeposits) {
+          await UserService.saveUser({
+            ...user,
+            hasDeposited: false,
+            firstDepositDate: undefined
+          });
+          updatedCount++;
+        }
+      }
+      
+      toast({ 
+        title: 'Success', 
+        description: `Reset hasDeposited for ${updatedCount} users who haven't actually deposited.` 
+      });
+    } catch (error) {
+      console.error('Error resetting hasDeposited:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset hasDeposited field.' });
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -317,10 +349,16 @@ function AppUsersTab() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input placeholder="Search by email or phone..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                   </div>
-                  <Button onClick={ensureReferralCodes} variant="outline" size="sm">
-                      <Ticket className="mr-2 h-4 w-4" />
-                      Ensure Referral Codes
-                  </Button>
+                  <div className="flex gap-2">
+                      <Button onClick={ensureReferralCodes} variant="outline" size="sm">
+                          <Ticket className="mr-2 h-4 w-4" />
+                          Ensure Referral Codes
+                      </Button>
+                      <Button onClick={resetHasDepositedForNonDepositors} variant="outline" size="sm">
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Reset HasDeposited
+                      </Button>
+                  </div>
               </div>
                {filteredUsers.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12">

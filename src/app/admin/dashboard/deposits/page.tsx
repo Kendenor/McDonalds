@@ -74,15 +74,6 @@ export default function DepositsPage() {
       
       const sortedDeposits = uniqueDeposits.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      // Debug: Log deposit transactions to see proofImage data
-      console.log('Deposit transactions:', sortedDeposits.map(d => ({
-        id: d.id,
-        userEmail: d.userEmail,
-        amount: d.amount,
-        hasProofImage: !!d.proofImage,
-        proofImageLength: d.proofImage ? d.proofImage.length : 0
-      })));
-      
       setTransactions(sortedDeposits);
       setIsLoading(false);
   }
@@ -144,7 +135,7 @@ export default function DepositsPage() {
         const isFirstDeposit = userData && !userData.hasDeposited;
         
         // Process referral bonus BEFORE updating user data (for first deposits only)
-        if (isFirstDeposit) {
+        if (isFirstDeposit && userData?.referredBy) {
           try {
             await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
           } catch (error) {
@@ -152,7 +143,7 @@ export default function DepositsPage() {
             toast({ 
               variant: 'destructive', 
               title: 'Warning', 
-              description: 'Deposit approved but referral bonus processing failed. Please check the console for details.' 
+              description: 'Deposit approved but referral bonus processing failed.' 
             });
           }
         }
@@ -171,7 +162,7 @@ export default function DepositsPage() {
           }
         } catch (error) {
           console.error('Error updating user balance:', error);
-          toast({ variant: 'destructive', title: 'Warning', description: 'Deposit approved but failed to update user balance. Please contact support.' });
+          toast({ variant: 'destructive', title: 'Warning', description: 'Deposit approved but failed to update user balance.' });
         }
 
         await NotificationService.createNotification({

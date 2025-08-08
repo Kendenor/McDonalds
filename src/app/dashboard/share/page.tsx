@@ -36,6 +36,18 @@ export default function SharePage() {
     const [teamData, setTeamData] = useState<{ level1: any[]; level2: any[]; level3: any[] }>({ level1: [], level2: [], level3: [] });
     const [isLoading, setIsLoading] = useState(true);
     
+    const refreshUserData = async () => {
+        if (!user) return;
+        try {
+            const loadedUser = await UserService.getUserById(user.uid);
+            if (loadedUser) {
+                setUserData(loadedUser);
+            }
+        } catch (error) {
+            console.error('Error refreshing user data:', error);
+        }
+    };
+    
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
@@ -81,6 +93,17 @@ export default function SharePage() {
                 unsubscribe();
             }
         };
+    }, [user]);
+
+    // Auto-refresh user data every 30 seconds to catch any updates
+    useEffect(() => {
+        if (!user) return;
+        
+        const interval = setInterval(() => {
+            refreshUserData();
+        }, 30000);
+        
+        return () => clearInterval(interval);
     }, [user]);
 
     const inviteCode = useMemo(() => {

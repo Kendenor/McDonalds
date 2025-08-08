@@ -1156,16 +1156,13 @@ export class ReferralService {
       return null;
     }
     try {
-      console.log('Looking up referral code:', referralCode);
       const q = query(collection(db, 'users'), where('referralCode', '==', referralCode));
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
         const user = { id: doc.id, ...doc.data() } as AppUser;
-        console.log('Found user with referral code:', user.email, user.phone);
         return user;
       }
-      console.log('No user found with referral code:', referralCode);
       return null;
     } catch (error) {
       console.error('Error getting user by referral code:', error);
@@ -1185,7 +1182,6 @@ export class ReferralService {
         if (!user.referralCode) {
           const newReferralCode = this.generateReferralCode();
           await UserService.saveUser({ ...user, referralCode: newReferralCode });
-          console.log(`Generated referral code ${newReferralCode} for user ${user.email}`);
         }
       }
     } catch (error) {
