@@ -1303,12 +1303,12 @@ export class ReferralService {
   // Process level 1 referral bonus (24% of welcome bonus for first deposit, 5% of deposit amount)
   private static async processLevel1ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
     const referrer = await UserService.getUserById(user.referredBy!);
-    if (!referrer) return;
+      if (!referrer) return;
 
-    const isFirstDeposit = !user.hasDeposited;
+      const isFirstDeposit = !user.hasDeposited;
     const welcomeBonus = 300;
     const registrationBonus = isFirstDeposit ? Math.round(welcomeBonus * 0.24) : 0; // 24% of welcome bonus
-    const depositBonus = Math.round(depositAmount * 0.05); // 5% of deposit amount
+      const depositBonus = Math.round(depositAmount * 0.05); // 5% of deposit amount
     const totalBonus = registrationBonus + depositBonus;
 
     if (totalBonus > 0) {
@@ -1541,4 +1541,4 @@ export class ReferralService {
       return 0;
     }
   }
-}
+} 
