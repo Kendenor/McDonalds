@@ -41,10 +41,17 @@ export default function SharePage() {
             setUser(currentUser);
             if (currentUser) {
                 try {
-                    const userData = await UserService.getUserById(currentUser.uid);
-                    setUserData(userData);
-                    
-                    if (userData) {
+                    const loadedUser = await UserService.getUserById(currentUser.uid);
+                    // Ensure the user has a referral code; if missing, generate and save one immediately
+                    if (loadedUser && !loadedUser.referralCode) {
+                        const code = ReferralService.generateReferralCode();
+                        await UserService.saveUser({ ...loadedUser, referralCode: code });
+                        setUserData({ ...loadedUser, referralCode: code });
+                    } else {
+                        setUserData(loadedUser);
+                    }
+
+                    if (loadedUser) {
                         const referralTree = await ReferralService.getReferralTree(currentUser.uid);
                         setTeamData(referralTree);
                     }
@@ -60,7 +67,7 @@ export default function SharePage() {
 
     const inviteCode = useMemo(() => {
         if (!userData) return 'ABCDEF';
-        return userData.referralCode || userData.id.substring(0, 6).toUpperCase();
+        return userData.referralCode || 'ABCDEF';
     }, [userData]);
 
     const inviteLink = useMemo(() => {

@@ -90,8 +90,9 @@ export default function RegisterClient() {
       // Process referral if provided
       let referrerId: string | undefined;
       if (referralCode) {
-        console.log('Processing referral code:', referralCode);
-        const referrer = await ReferralService.getUserByReferralCode(referralCode);
+        const normalizedCode = referralCode.trim().toUpperCase();
+        console.log('Processing referral code:', normalizedCode);
+        const referrer = await ReferralService.getUserByReferralCode(normalizedCode);
         if (referrer) {
           referrerId = referrer.id;
           console.log('Found referrer:', referrer.email, 'ID:', referrerId);
@@ -104,7 +105,7 @@ export default function RegisterClient() {
       const newUserReferralCode = ReferralService.generateReferralCode();
       
       // Create user profile with welcome bonus
-      const newUser = {
+      const newUser: any = {
         id: userCredential.user.uid,
         email: email,
         phone: phone,
@@ -115,9 +116,12 @@ export default function RegisterClient() {
         totalDeposits: 0,
         totalWithdrawals: 0,
         referralCode: newUserReferralCode, // Generate new referral code for user
-        referredBy: referrerId,
       };
-      
+      // Only include referredBy if we have a valid referrer (Firestore disallows undefined values)
+      if (referrerId) {
+        newUser.referredBy = referrerId;
+      }
+
       await UserService.saveUser(newUser);
       
       // Process referral bonus if referrer found
@@ -134,7 +138,9 @@ export default function RegisterClient() {
       
       toast({ 
         title: "Registration successful!", 
-        description: "Welcome bonus of ₦300 has been added to your account!" 
+        description: referrerId
+          ? "Your referral was applied and your ₦300 welcome bonus has been added."
+          : "Welcome bonus of ₦300 has been added to your account!"
       });
       router.push("/dashboard");
     } catch (error: any) {
