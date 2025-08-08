@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast'
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth'
+import { onAuthStateChanged, User as FirebaseUser, sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { UserService, NotificationService, TransactionService, AdminNotificationService } from '@/lib/user-service'
 
@@ -146,48 +146,41 @@ function AppUsersTab() {
   }
 
   const changePassword = async (userId: string) => {
-      const newPassword = prompt("Enter new password for user (minimum 6 characters):");
-      if (!newPassword) return;
-      
-      if (newPassword.length < 6) {
-          toast({ variant: 'destructive', title: 'Invalid Password', description: 'Password must be at least 6 characters long.'});
-          return;
-      }
-
       try {
-          // Store password reset requirement in user data
+          // Get user data to get email
           const user = await UserService.getUserById(userId);
-          if (user) {
-              await UserService.saveUser({ 
-                  ...user, 
-                  passwordResetRequired: true,
-                  tempPassword: newPassword // In production, this should be hashed
-              });
-              
-              // Create admin notification for password change
-              await AdminNotificationService.createAdminNotification({
-                  message: `Password reset initiated for user ${userId}. User will update password on next login.`,
-                  date: new Date().toISOString(),
-                  read: false,
-                  type: 'system'
-              });
-              
-              // Send notification to user
-              await NotificationService.createNotification(userId, {
-                  message: `Your password has been reset by an administrator. Please update your password on next login.`,
-                  date: new Date().toISOString(),
-                  read: false,
-                  type: 'system'
-              });
-              
-              toast({ 
-                  title: 'Password Reset Initiated', 
-                  description: 'User will be prompted to update password on next login.' 
-              });
+          if (!user) {
+              toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
+              return;
           }
+
+          // Send password reset email using Firebase
+          await sendPasswordResetEmail(auth, user.email);
+              
+          // Create admin notification for password change
+          await AdminNotificationService.createAdminNotification({
+              message: `Password reset email sent to user ${user.email}`,
+              date: new Date().toISOString(),
+              read: false,
+              type: 'system'
+          });
+              
+          // Send notification to user
+          await NotificationService.createNotification({
+              userId: userId,
+              message: `A password reset email has been sent to your email address. Please check your inbox and follow the instructions to reset your password.`,
+              date: new Date().toISOString(),
+              read: false,
+              type: 'system'
+          });
+              
+          toast({ 
+              title: 'Password Reset Email Sent', 
+              description: 'User will receive a password reset email with instructions.' 
+          });
       } catch (error) {
-          console.error('Error changing password:', error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset user password.' });
+          console.error('Error sending password reset email:', error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to send password reset email.' });
       }
   }
   

@@ -179,8 +179,8 @@ export default function SharePage() {
                 <Award size={28} className="text-yellow-400" />
             </div>
             <div>
-              <p className="text-lg font-bold text-yellow-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 24% + 5% Commission</p>
-              <p className="text-sm text-muted-foreground">Level 1 Referrals (First Deposit)</p>
+              <p className="text-lg font-bold text-yellow-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 19% Commission</p>
+              <p className="text-sm text-muted-foreground">Level 1 Referrals (First Deposit Only)</p>
             </div>
           </CardContent>
         </Card>
@@ -190,8 +190,8 @@ export default function SharePage() {
                 <Award size={28} className="text-slate-400" />
             </div>
             <div>
-               <p className="text-lg font-bold text-slate-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 3% Commission</p>
-               <p className="text-sm text-muted-foreground">Level 2 Referrals (On Deposit)</p>
+               <p className="text-lg font-bold text-slate-400 flex items-center gap-1"><Star size={16} fill="currentColor"/> 2% Commission</p>
+               <p className="text-sm text-muted-foreground">Level 2 Referrals (First Deposit Only)</p>
             </div>
           </CardContent>
         </Card>
@@ -201,8 +201,8 @@ export default function SharePage() {
                 <Award size={28} className="text-amber-600" />
             </div>
             <div>
-               <p className="text-lg font-bold text-amber-600 flex items-center gap-1"><Star size={16} fill="currentColor"/> 2% Commission</p>
-               <p className="text-sm text-muted-foreground">Level 3 Referrals (On Deposit)</p>
+               <p className="text-lg font-bold text-amber-600 flex items-center gap-1"><Star size={16} fill="currentColor"/> 1% Commission</p>
+               <p className="text-sm text-muted-foreground">Level 3 Referrals (First Deposit Only)</p>
             </div>
           </CardContent>
         </Card>

@@ -60,7 +60,7 @@ export default function AdminSettingsPage() {
     }
   });
 
-  useEffect(() => {
+    useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -72,8 +72,8 @@ export default function AdminSettingsPage() {
     return () => unsubscribe();
   }, []);
 
-  const loadSettings = async () => {
-    try {
+        const loadSettings = async () => {
+            try {
       const currentSettings = await SettingsService.getSettings();
       setSettings({
         ...currentSettings,
@@ -82,8 +82,8 @@ export default function AdminSettingsPage() {
           ...currentSettings.popupContent
         }
       });
-    } catch (error) {
-      console.error('Error loading settings:', error);
+            } catch (error) {
+                console.error('Error loading settings:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load settings.' });
     }
   };
@@ -140,8 +140,8 @@ export default function AdminSettingsPage() {
     );
   }
 
-  return (
-    <div className="space-y-6">
+    return (
+        <div className="space-y-6">
       {/* Quick Settings Popover */}
       <div className="flex justify-between items-center">
         <div>
@@ -192,8 +192,8 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Main Settings Card */}
-      <Card>
-        <CardHeader>
+            <Card>
+                <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Application Settings
@@ -201,7 +201,7 @@ export default function AdminSettingsPage() {
           <CardDescription>
             Configure application settings, limits, and popup content. Click "Edit Settings" to modify values.
           </CardDescription>
-        </CardHeader>
+                </CardHeader>
         <CardContent className="space-y-6">
           {/* Current Settings Display */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -223,12 +223,12 @@ export default function AdminSettingsPage() {
             <div className="p-4 border rounded-lg">
               <h4 className="font-medium text-sm text-muted-foreground">Telegram Link</h4>
               <p className="text-sm truncate">{settings.telegramLink || 'Not set'}</p>
-            </div>
+                        </div>
             <div className="p-4 border rounded-lg">
               <h4 className="font-medium text-sm text-muted-foreground">WhatsApp Link</h4>
               <p className="text-sm truncate">{settings.whatsappLink || 'Not set'}</p>
-            </div>
-          </div>
+                        </div>
+                    </div>
 
           <Button 
             onClick={() => setIsDialogOpen(true)} 
@@ -262,37 +262,37 @@ export default function AdminSettingsPage() {
 
             <TabsContent value="limits" className="space-y-6">
               {/* Deposit Limits */}
-              <div className="space-y-4">
+                    <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
                   Deposit Limits
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="minDeposit">Minimum Deposit (₦)</Label>
-                    <Input 
-                      id="minDeposit" 
-                      type="number" 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="minDeposit">Minimum Deposit (₦)</Label>
+                                <Input 
+                                    id="minDeposit" 
+                                    type="number" 
                       value={settings.minDeposit || 3000}
                       onChange={(e) => handleInputChange('minDeposit', e.target.value)}
-                      placeholder="3000" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxDeposit">Maximum Deposit (₦)</Label>
-                    <Input 
-                      id="maxDeposit" 
-                      type="number" 
+                                    placeholder="3000" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="maxDeposit">Maximum Deposit (₦)</Label>
+                                <Input 
+                                    id="maxDeposit" 
+                                    type="number" 
                       value={settings.maxDeposit || 500000}
                       onChange={(e) => handleInputChange('maxDeposit', e.target.value)}
-                      placeholder="500000" 
-                    />
-                  </div>
-                </div>
-              </div>
+                                    placeholder="500000" 
+                                />
+                            </div>
+                        </div>
+                    </div>
 
               {/* Withdrawal Limits */}
-              <div className="space-y-4">
+                    <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <ArrowDownUp className="h-4 w-4" />
                   Withdrawal Limits
@@ -309,7 +309,7 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 </div>
-              </div>
+                            </div>
             </TabsContent>
 
             <TabsContent value="socials" className="space-y-6">
@@ -329,7 +329,7 @@ export default function AdminSettingsPage() {
                       onChange={(e) => handleInputChange('telegramLink', e.target.value)}
                       placeholder="https://t.me/yourchannel"
                     />
-                  </div>
+                        </div>
                   <div className="space-y-2">
                     <Label htmlFor="whatsappLink">WhatsApp Link</Label>
                     <Input
@@ -339,9 +339,9 @@ export default function AdminSettingsPage() {
                       onChange={(e) => handleInputChange('whatsappLink', e.target.value)}
                       placeholder="https://wa.me/yournumber"
                     />
-                  </div>
-                </div>
-              </div>
+                                </div>
+                        </div>
+                    </div>
             </TabsContent>
 
             <TabsContent value="popups" className="space-y-6">
@@ -354,8 +354,8 @@ export default function AdminSettingsPage() {
                 <p className="text-sm text-muted-foreground">
                   Edit the content that appears in popups and notifications for users.
                 </p>
-                
-                <div className="space-y-4">
+
+                    <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="welcomeMessage">Welcome Message</Label>
                     <Textarea
@@ -397,7 +397,7 @@ export default function AdminSettingsPage() {
                       placeholder="Message shown when withdrawal is submitted"
                       rows={2}
                     />
-                  </div>
+                            </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="referralBonusMessage">Referral Bonus Message</Label>
@@ -408,8 +408,8 @@ export default function AdminSettingsPage() {
                       placeholder="Message shown when referral bonus is received"
                       rows={2}
                     />
-                  </div>
-
+                        </div>
+                       
                   <div className="space-y-2">
                     <Label htmlFor="dailyLoginMessage">Daily Login Message</Label>
                     <Textarea
@@ -419,9 +419,9 @@ export default function AdminSettingsPage() {
                       placeholder="Message shown for daily login bonus"
                       rows={2}
                     />
-                  </div>
-                </div>
-              </div>
+                                </div>
+                        </div>
+                    </div>
             </TabsContent>
           </Tabs>
           
@@ -439,7 +439,7 @@ export default function AdminSettingsPage() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Settings
+                            Save Settings
                 </>
               )}
             </Button>
@@ -449,10 +449,10 @@ export default function AdminSettingsPage() {
               disabled={isSaving}
             >
               Cancel
-            </Button>
-          </div>
+                        </Button>
+                    </div>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
   );
 }
