@@ -1283,7 +1283,12 @@ export class ReferralService {
     }
     try {
       const user = await UserService.getUserById(userId);
-      if (!user || !user.referredBy) return;
+      if (!user || !user.referredBy) {
+        console.log('User not found or no referrer found');
+        return;
+      }
+
+      console.log('Processing referral bonus for first deposit:', depositAmount, 'for user:', user.email);
 
       // Process level 1 referral (direct referrer)
       await this.processLevel1ReferralBonus(user, depositAmount);
@@ -1303,14 +1308,13 @@ export class ReferralService {
   // Process level 1 referral bonus (19% of deposit amount for first deposit only)
   private static async processLevel1ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
     const referrer = await UserService.getUserById(user.referredBy!);
-    if (!referrer) return;
+    if (!referrer) {
+      console.log('Level 1 referrer not found');
+      return;
+    }
 
-    const isFirstDeposit = !user.hasDeposited;
-    
-    // Only process bonus for first deposits
-    if (!isFirstDeposit) return;
-    
     const level1Bonus = Math.round(depositAmount * 0.19); // 19% of deposit amount
+    console.log('Level 1 bonus:', level1Bonus, 'for referrer:', referrer.email);
 
     if (level1Bonus > 0) {
       // Update referrer's balance and stats
@@ -1341,23 +1345,27 @@ export class ReferralService {
         read: false,
         type: 'referral'
       });
+
+      console.log('Level 1 referral bonus processed successfully');
     }
   }
 
   // Process level 2 referral bonus (2% of deposit amount for first deposit only)
   private static async processLevel2ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
     const level1Referrer = await UserService.getUserById(user.referredBy!);
-    if (!level1Referrer || !level1Referrer.referredBy) return;
+    if (!level1Referrer || !level1Referrer.referredBy) {
+      console.log('Level 2 referrer not found');
+      return;
+    }
 
     const level2Referrer = await UserService.getUserById(level1Referrer.referredBy);
-    if (!level2Referrer) return;
-
-    const isFirstDeposit = !user.hasDeposited;
-    
-    // Only process bonus for first deposits
-    if (!isFirstDeposit) return;
+    if (!level2Referrer) {
+      console.log('Level 2 referrer not found');
+      return;
+    }
 
     const level2Bonus = Math.round(depositAmount * 0.02); // 2% of deposit amount
+    console.log('Level 2 bonus:', level2Bonus, 'for referrer:', level2Referrer.email);
 
     if (level2Bonus > 0) {
       // Update level 2 referrer's balance
@@ -1388,26 +1396,33 @@ export class ReferralService {
         read: false,
         type: 'referral'
       });
+
+      console.log('Level 2 referral bonus processed successfully');
     }
   }
 
   // Process level 3 referral bonus (1% of deposit amount for first deposit only)
   private static async processLevel3ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
     const level1Referrer = await UserService.getUserById(user.referredBy!);
-    if (!level1Referrer || !level1Referrer.referredBy) return;
+    if (!level1Referrer || !level1Referrer.referredBy) {
+      console.log('Level 3 referrer not found');
+      return;
+    }
 
     const level2Referrer = await UserService.getUserById(level1Referrer.referredBy);
-    if (!level2Referrer || !level2Referrer.referredBy) return;
+    if (!level2Referrer || !level2Referrer.referredBy) {
+      console.log('Level 3 referrer not found');
+      return;
+    }
 
     const level3Referrer = await UserService.getUserById(level2Referrer.referredBy);
-    if (!level3Referrer) return;
-
-    const isFirstDeposit = !user.hasDeposited;
-    
-    // Only process bonus for first deposits
-    if (!isFirstDeposit) return;
+    if (!level3Referrer) {
+      console.log('Level 3 referrer not found');
+      return;
+    }
 
     const level3Bonus = Math.round(depositAmount * 0.01); // 1% of deposit amount
+    console.log('Level 3 bonus:', level3Bonus, 'for referrer:', level3Referrer.email);
 
     if (level3Bonus > 0) {
       // Update level 3 referrer's balance
@@ -1438,6 +1453,8 @@ export class ReferralService {
         read: false,
         type: 'referral'
       });
+
+      console.log('Level 3 referral bonus processed successfully');
     }
   }
 

@@ -74,24 +74,27 @@ export default function LoginClient() {
         if (userData && userData.adminChangedPassword && userData.passwordChangedByAdmin) {
           // Check if the password matches the admin-changed password
           if (password === userData.adminChangedPassword) {
-            // Password matches admin-changed password, proceed with login
-            // Since we can't change Firebase Auth password directly, we'll use a workaround
-            // We'll try to use the admin password with Firebase Auth
+            // Password matches admin-changed password, try to authenticate with Firebase
             try {
+              // Try to sign in with the admin password
               await signInWithEmailAndPassword(auth, email, password);
               toast({ title: "Login successful!" });
               router.push("/dashboard");
               return;
             } catch (firebaseError: any) {
-              // If Firebase auth fails with admin password, we need to handle this
-              // For now, we'll show a specific message for admin-changed passwords
+              // If Firebase auth fails, the admin password might not be synced with Firebase
+              // In this case, we'll show a specific message
+              console.log('Firebase auth failed with admin password:', firebaseError);
               toast({
                 variant: "destructive",
                 title: "Login Failed",
-                description: "Your password was changed by an administrator. Please use the new password provided by the admin.",
+                description: "Your password was changed by an administrator. Please try using the new password provided by the admin. If you continue to have issues, please contact support.",
               });
               return;
             }
+          } else {
+            // Admin password doesn't match, try normal login
+            console.log('Admin password provided but doesn\'t match stored admin password');
           }
         }
       } catch (error) {
@@ -104,6 +107,24 @@ export default function LoginClient() {
       toast({ title: "Login successful!" });
       router.push("/dashboard");
     } catch (error: any) {
+      // Check if this might be an admin-changed password issue
+      if (error.code === 'auth/wrong-password') {
+        try {
+          const email = generateEmailAddress(phone);
+          const userData = await UserService.getUserById(email);
+          if (userData && userData.adminChangedPassword && userData.passwordChangedByAdmin) {
+            toast({
+              variant: "destructive",
+              title: "Login Failed",
+              description: "Your password was changed by an administrator. Please use the new password provided by the admin.",
+            });
+            return;
+          }
+        } catch (userDataError) {
+          // Continue with normal error handling
+        }
+      }
+      
       toast({
         variant: "destructive",
         title: "Login Failed",

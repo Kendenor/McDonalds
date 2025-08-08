@@ -139,9 +139,30 @@ export default function DepositsPage() {
       // Send notification to user about deposit status
       const transaction = transactions.find(t => t.id === id);
       if (transaction && newStatus === 'Completed') {
+        // Get user data first to check if this is their first deposit
+        const userData = await UserService.getUserById(transaction.userId);
+        const isFirstDeposit = userData && !userData.hasDeposited;
+        
+        // Process referral bonus BEFORE updating user data (for first deposits only)
+        if (isFirstDeposit) {
+          try {
+            console.log('Processing referral bonus for first deposit - user:', transaction.userId, 'amount:', transaction.amount);
+            await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
+            console.log('Referral bonus processed successfully');
+          } catch (error) {
+            console.error('Error processing referral bonus:', error);
+            toast({ 
+              variant: 'destructive', 
+              title: 'Warning', 
+              description: 'Deposit approved but referral bonus processing failed. Please check the console for details.' 
+            });
+          }
+        } else {
+          console.log('Not first deposit, skipping referral bonus processing');
+        }
+        
         // Update user's balance when deposit is approved
         try {
-          const userData = await UserService.getUserById(transaction.userId);
           if (userData) {
             const updatedUser = {
               ...userData,
@@ -164,13 +185,6 @@ export default function DepositsPage() {
           date: new Date().toISOString(),
           read: false
         });
-        
-        // Process referral bonus for first deposit
-        try {
-          await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
-        } catch (error) {
-          console.error('Error processing referral bonus:', error);
-        }
         
         // Create admin notification
         await AdminNotificationService.createAdminNotification({

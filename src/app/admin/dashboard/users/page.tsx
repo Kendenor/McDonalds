@@ -21,12 +21,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle } from "lucide-react"
+import { MoreHorizontal, Search, UserX, ShieldCheck, PlusCircle, Loader, KeyRound, DollarSign, MinusCircle, Ticket } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast'
 import { onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, updatePassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import { UserService, NotificationService, TransactionService, AdminNotificationService } from '@/lib/user-service'
+import { UserService, NotificationService, TransactionService, AdminNotificationService, ReferralService } from '@/lib/user-service'
 
 interface AppUser {
     id: string;
@@ -106,6 +106,17 @@ function AppUsersTab() {
     }
   }
 
+  const ensureReferralCodes = async () => {
+    try {
+      await ReferralService.ensureAllUsersHaveReferralCodes();
+      toast({ title: 'Success', description: 'All users now have referral codes.' });
+      fetchUsers(); // Refresh the user list
+    } catch (error) {
+      console.error('Error ensuring referral codes:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to ensure referral codes.' });
+    }
+  }
+
   useEffect(() => {
     fetchUsers();
   }, [])
@@ -181,7 +192,7 @@ function AppUsersTab() {
 
       setIsChangingPassword(true);
       try {
-          // Store the new password in user data
+          // Store the new password in user data for backup authentication
           const updatedUser = {
               ...selectedUserForPassword,
               adminChangedPassword: newPassword,
@@ -191,10 +202,6 @@ function AppUsersTab() {
           
           await UserService.saveUser(updatedUser);
           
-          // IMPORTANT: The password is now stored in the user data
-          // The user will need to use this password to log in
-          // This is a custom authentication system that works alongside Firebase Auth
-              
           // Create admin notification for password change
           await AdminNotificationService.createAdminNotification({
               message: `Password changed for ${selectedUserForPassword.email}. New password: ${newPassword}`,
@@ -214,7 +221,7 @@ function AppUsersTab() {
               
           toast({ 
               title: 'Password Changed Successfully', 
-              description: `Password has been changed for ${selectedUserForPassword.email}. New password: ${newPassword}. IMPORTANT: Please inform the user of their new password. The password is now stored in the system.` 
+              description: `Password has been changed for ${selectedUserForPassword.email}. New password: ${newPassword}. IMPORTANT: The user should use this password to log in. If they have trouble logging in, they may need to reset their password through the normal reset process.` 
           });
           
           setShowPasswordModal(false);
@@ -310,6 +317,10 @@ function AppUsersTab() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input placeholder="Search by email or phone..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                   </div>
+                  <Button onClick={ensureReferralCodes} variant="outline" size="sm">
+                      <Ticket className="mr-2 h-4 w-4" />
+                      Ensure Referral Codes
+                  </Button>
               </div>
                {filteredUsers.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12">
