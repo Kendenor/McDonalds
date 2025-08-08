@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { generateEmailAddress, getAuthErrorMessage } from '@/lib/utils';
-import { UserService } from '@/lib/user-service';
+import { UserService, ReferralService } from '@/lib/user-service';
 
 export default function RegisterClient() {
   const router = useRouter();
@@ -87,6 +87,22 @@ export default function RegisterClient() {
       const email = generateEmailAddress(phone);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
+      // Process referral if provided
+      let referrerId: string | undefined;
+      if (referralCode) {
+        console.log('Processing referral code:', referralCode);
+        const referrer = await ReferralService.getUserByReferralCode(referralCode);
+        if (referrer) {
+          referrerId = referrer.id;
+          console.log('Found referrer:', referrer.email, 'ID:', referrerId);
+        } else {
+          console.log('No referrer found for code:', referralCode);
+        }
+      }
+
+      // Generate referral code for new user
+      const newUserReferralCode = ReferralService.generateReferralCode();
+      
       // Create user profile with welcome bonus
       const newUser = {
         id: userCredential.user.uid,
@@ -98,10 +114,23 @@ export default function RegisterClient() {
         balance: 300, // Welcome bonus
         totalDeposits: 0,
         totalWithdrawals: 0,
-        referralCode: referralCode || undefined,
+        referralCode: newUserReferralCode, // Generate new referral code for user
+        referredBy: referrerId,
       };
       
       await UserService.saveUser(newUser);
+      
+      // Process referral bonus if referrer found
+      if (referrerId) {
+        try {
+          console.log('Processing referral bonus for new user:', userCredential.user.uid, 'referrer:', referrerId);
+          await ReferralService.processReferralBonus(userCredential.user.uid, referrerId);
+          console.log('Referral bonus processed successfully');
+        } catch (error) {
+          console.error('Error processing referral bonus:', error);
+          // Don't fail registration if referral processing fails
+        }
+      }
       
       toast({ 
         title: "Registration successful!", 

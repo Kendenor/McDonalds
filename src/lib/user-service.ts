@@ -1156,17 +1156,40 @@ export class ReferralService {
       return null;
     }
     try {
+      console.log('Looking up referral code:', referralCode);
       const q = query(collection(db, 'users'), where('referralCode', '==', referralCode));
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
         const user = { id: doc.id, ...doc.data() } as AppUser;
+        console.log('Found user with referral code:', user.email, user.phone);
         return user;
       }
+      console.log('No user found with referral code:', referralCode);
       return null;
     } catch (error) {
       console.error('Error getting user by referral code:', error);
       throw error;
+    }
+  }
+
+  // Ensure all users have referral codes (utility function)
+  static async ensureAllUsersHaveReferralCodes(): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot ensure referral codes');
+      return;
+    }
+    try {
+      const allUsers = await UserService.getAllUsers();
+      for (const user of allUsers) {
+        if (!user.referralCode) {
+          const newReferralCode = this.generateReferralCode();
+          await UserService.saveUser({ ...user, referralCode: newReferralCode });
+          console.log(`Generated referral code ${newReferralCode} for user ${user.email}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring referral codes:', error);
     }
   }
 
@@ -1184,7 +1207,7 @@ export class ReferralService {
       }
 
       // Calculate bonus (24% of welcome bonus)
-      const welcomeBonus = 550;
+      const welcomeBonus = 300; // Updated to match new welcome bonus
       const referralBonus = Math.round(welcomeBonus * 0.24); // 24% of welcome bonus
 
       // Update referrer's balance and referral stats
