@@ -116,6 +116,9 @@ export default function RegisterClient() {
         totalDeposits: 0,
         totalWithdrawals: 0,
         referralCode: newUserReferralCode, // Generate new referral code for user
+        hasDeposited: false, // Important: Set to false for new users
+        referralEarnings: 0, // Initialize referral earnings
+        totalReferrals: 0, // Initialize total referrals
       };
       // Only include referredBy if we have a valid referrer (Firestore disallows undefined values)
       if (referrerId) {

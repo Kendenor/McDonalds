@@ -138,10 +138,6 @@ export class UserService {
 
   // Get user by ID
   static async getUserById(userId: string): Promise<AppUser | null> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, returning null');
-      return null;
-    }
     try {
       const userDoc = await getDoc(doc(db, this.COLLECTION, userId));
       if (userDoc.exists()) {
@@ -156,10 +152,6 @@ export class UserService {
 
   // Create or update user
   static async saveUser(user: AppUser): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot save user');
-      throw new Error('Firebase not initialized');
-    }
     try {
       const userDoc = doc(db, this.COLLECTION, user.id);
       await setDoc(userDoc, {
@@ -253,10 +245,6 @@ export class TransactionService {
 
   // Create transaction
   static async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<string> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot create transaction');
-      throw new Error('Firebase not initialized');
-    }
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...transaction,
@@ -271,10 +259,6 @@ export class TransactionService {
 
   // Update transaction status
   static async updateTransactionStatus(transactionId: string, status: 'Completed' | 'Pending' | 'Failed'): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot update transaction status');
-      throw new Error('Firebase not initialized');
-    }
     try {
       const transactionDoc = doc(db, this.COLLECTION, transactionId);
       await updateDoc(transactionDoc, {
@@ -1273,15 +1257,25 @@ export class ReferralService {
 
   // Process deposit referral bonus with multi-level support
   static async processDepositReferralBonus(userId: string, depositAmount: number): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot process deposit referral bonus');
-      return;
-    }
     try {
       const user = await UserService.getUserById(userId);
       if (!user || !user.referredBy) {
+        console.log('User not found or no referrer:', userId, user?.referredBy);
         return;
       }
+
+      // Check if referral bonus has already been paid for this user
+      const existingReferralTransactions = await TransactionService.getTransactionsByUser(user.referredBy);
+      const alreadyPaid = existingReferralTransactions.some(t => 
+        t.type === 'Referral_Bonus' && t.referralUserId === userId
+      );
+
+      if (alreadyPaid) {
+        console.log('Referral bonus already paid for user:', userId);
+        return;
+      }
+
+      console.log('Processing referral bonus for user:', userId, 'Amount:', depositAmount);
 
       // Process level 1 referral (direct referrer)
       await this.processLevel1ReferralBonus(user, depositAmount);
@@ -1302,10 +1296,12 @@ export class ReferralService {
   private static async processLevel1ReferralBonus(user: AppUser, depositAmount: number): Promise<void> {
     const referrer = await UserService.getUserById(user.referredBy!);
     if (!referrer) {
+      console.log('Referrer not found for user:', user.id);
       return;
     }
 
     const level1Bonus = Math.round(depositAmount * 0.19); // 19% of deposit amount
+    console.log('Processing Level 1 referral bonus:', level1Bonus, 'for referrer:', referrer.email);
 
     if (level1Bonus > 0) {
       // Update referrer's balance and stats
@@ -1313,9 +1309,11 @@ export class ReferralService {
         ...referrer,
         balance: (referrer.balance || 0) + level1Bonus,
         referralEarnings: (referrer.referralEarnings || 0) + level1Bonus
+        // Note: totalReferrals should not be incremented here as it's already set during registration
       };
       
       await UserService.saveUser(updatedReferrer);
+      console.log('Updated referrer balance and stats for:', referrer.email);
 
       // Create transaction
       await TransactionService.createTransaction({
@@ -1328,6 +1326,7 @@ export class ReferralService {
         description: `Level 1 referral bonus for first deposit`,
         referralUserId: user.id
       });
+      console.log('Created referral bonus transaction for:', referrer.email);
 
       // Create notification
       await NotificationService.createNotification({
@@ -1337,6 +1336,7 @@ export class ReferralService {
         read: false,
         type: 'referral'
       });
+      console.log('Created referral notification for:', referrer.email);
     }
   }
 
@@ -1443,10 +1443,6 @@ export class ReferralService {
     level2: AppUser[];
     level3: AppUser[];
   }> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot get referral tree');
-      return { level1: [], level2: [], level3: [] };
-    }
     try {
       const level1 = await this.getDirectReferrals(userId);
       const level2: AppUser[] = [];

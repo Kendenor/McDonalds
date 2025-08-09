@@ -17,16 +17,19 @@ const firebaseConfig = {
   measurementId: "G-ZMF627YT28"
 };
 
-// Initialize Firebase only on client side
+// Initialize Firebase for both client and server side
 let app: any;
 let auth: any;
 let db: any;
 
-if (typeof window !== 'undefined') {
-  // Client-side initialization
+try {
+  // Initialize Firebase for both client and server
   app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
   db = getFirestore(app);
+} catch (error) {
+  console.warn('Firebase initialization warning:', error);
+  // Continue without Firebase if initialization fails
 }
 
 export { app, auth, db };

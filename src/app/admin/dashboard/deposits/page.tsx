@@ -132,12 +132,23 @@ export default function DepositsPage() {
       if (transaction && newStatus === 'Completed') {
         // Get user data first to check if this is their first deposit
         const userData = await UserService.getUserById(transaction.userId);
+        console.log('User data for deposit:', {
+          userId: transaction.userId,
+          hasDeposited: userData?.hasDeposited,
+          referredBy: userData?.referredBy,
+          balance: userData?.balance,
+          totalDeposits: userData?.totalDeposits
+        });
+        
         const isFirstDeposit = userData && !userData.hasDeposited;
+        console.log('Is first deposit:', isFirstDeposit);
         
         // Process referral bonus BEFORE updating user data (for first deposits only)
         if (isFirstDeposit && userData?.referredBy) {
+          console.log('Processing referral bonus for first deposit:', transaction.userId, 'Amount:', transaction.amount, 'Referrer:', userData.referredBy);
           try {
             await ReferralService.processDepositReferralBonus(transaction.userId, transaction.amount);
+            console.log('Referral bonus processed successfully for user:', transaction.userId);
           } catch (error) {
             console.error('Error processing referral bonus:', error);
             toast({ 
@@ -146,6 +157,12 @@ export default function DepositsPage() {
               description: 'Deposit approved but referral bonus processing failed.' 
             });
           }
+        } else {
+          console.log('Skipping referral bonus - not first deposit or no referrer:', {
+            isFirstDeposit,
+            hasReferrer: !!userData?.referredBy,
+            userId: transaction.userId
+          });
         }
         
         // Update user's balance when deposit is approved
@@ -159,6 +176,12 @@ export default function DepositsPage() {
               firstDepositDate: new Date().toISOString()
             };
             await UserService.saveUser(updatedUser);
+            console.log('Updated user data after deposit approval:', {
+              userId: transaction.userId,
+              newBalance: updatedUser.balance,
+              newTotalDeposits: updatedUser.totalDeposits,
+              hasDeposited: updatedUser.hasDeposited
+            });
           }
         } catch (error) {
           console.error('Error updating user balance:', error);

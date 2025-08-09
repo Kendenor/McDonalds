@@ -149,6 +149,57 @@ function AppUsersTab() {
     }
   };
 
+  const initializeReferralFields = async () => {
+    try {
+      const allUsers = await UserService.getAllUsers();
+      let updatedCount = 0;
+      
+      for (const user of allUsers) {
+        let needsUpdate = false;
+        const updates: Partial<AppUser> = {};
+        
+        // Initialize referralEarnings if missing
+        if (user.referralEarnings === undefined) {
+          updates.referralEarnings = 0;
+          needsUpdate = true;
+        }
+        
+        // Initialize totalReferrals if missing
+        if (user.totalReferrals === undefined) {
+          updates.totalReferrals = 0;
+          needsUpdate = true;
+        }
+        
+        // Initialize hasDeposited if missing
+        if (user.hasDeposited === undefined) {
+          // Check if user has any completed deposits
+          const userTransactions = await TransactionService.getTransactionsByUser(user.id);
+          const hasCompletedDeposits = userTransactions.some(t => 
+            t.type === 'Deposit' && t.status === 'Completed'
+          );
+          updates.hasDeposited = hasCompletedDeposits;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await UserService.saveUser({
+            ...user,
+            ...updates
+          });
+          updatedCount++;
+        }
+      }
+      
+      toast({ 
+        title: 'Success', 
+        description: `Initialized referral fields for ${updatedCount} users.` 
+      });
+    } catch (error) {
+      console.error('Error initializing referral fields:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to initialize referral fields.' });
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, [])

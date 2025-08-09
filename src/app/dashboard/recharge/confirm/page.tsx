@@ -162,16 +162,9 @@ function ConfirmDepositContent() {
                 transactionRef,
             });
             
-            console.log('Updating user deposit status...');
-            // Update user's deposit status if this is their first deposit
-            if (isFirstDeposit && userData) {
-                const updatedUser = {
-                    ...userData,
-                    hasDeposited: true,
-                    firstDepositDate: new Date().toISOString()
-                };
-                await UserService.saveUser(updatedUser);
-            }
+            console.log('Deposit transaction created successfully');
+            // Note: hasDeposited will be set to true when admin approves the deposit
+            // This ensures referral bonuses are only paid for approved deposits
             
             console.log('Creating admin notification...');
             // Create admin notification for new deposit request
