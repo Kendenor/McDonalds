@@ -2,7 +2,7 @@
 'use client';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { Folder, List, Landmark, KeyRound, Power, ChevronRight, Megaphone, Users, Info } from 'lucide-react';
+import { Folder, List, Landmark, KeyRound, Power, ChevronRight, Megaphone, Users, Info, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -152,6 +152,7 @@ export default function MinePage() {
             <AccountMenuItem icon={<Landmark size={24}/>} label="Bank" href="/dashboard/add-account" />
             <AccountMenuItem icon={<KeyRound size={24}/>} label="Change Password" href="/dashboard/change-password" />
             <AccountMenuItem icon={<Users size={24}/>} label="Socials" href="/dashboard/socials" />
+            <AccountMenuItem icon={<Download size={24}/>} label="Download App" href="/downloads" />
             <AccountMenuItem icon={<Info size={24}/>} label="About Us" href="/dashboard/about" />
             <AccountMenuItem icon={<Power size={24}/>} label="Logout" onClick={handleLogout} isLogout/>
         </div>

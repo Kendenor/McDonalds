@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, User, Lock } from 'lucide-react';
+import { AlertTriangle, User, Lock, Download } from 'lucide-react';
 import { AppLoader } from '@/components/ui/app-loader';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
@@ -190,9 +190,33 @@ export default function LoginClient() {
               {isLoading ? <AppLoader size="sm" text="Logging in..." /> : 'Login'}
             </Button>
           </form>
-          <div className="mt-6 text-center">
-            <span className="text-sm text-muted-foreground">Don't have an account? </span>
-            <Link href="/register" className="text-primary font-semibold hover:underline">Register</Link>
+          <div className="mt-6 space-y-4">
+            <div className="text-center">
+              <span className="text-sm text-muted-foreground">Don't have an account? </span>
+              <Link href="/register" className="text-primary font-semibold hover:underline">Register</Link>
+            </div>
+            <div className="text-center border-t pt-4">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = '/downloads/android/McDonald-App.apk';
+                  link.download = 'McDonald-App.apk';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Mobile App
+              </Button>
+              <div className="mt-2">
+                <Link href="/downloads" className="text-xs text-muted-foreground hover:underline">
+                  View all download options
+                </Link>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
