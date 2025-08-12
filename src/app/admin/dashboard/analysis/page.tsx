@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, DollarSign, ArrowDownUp, TrendingUp, Bell, BarChart3, Activity, Target } from 'lucide-react';
-import { UserService } from '@/lib/user-service';
+import { UserService, TransactionService, DataService } from '@/lib/user-service';
 import { Loader } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface DashboardStats {
   totalUsers: number;
@@ -38,31 +40,88 @@ export default function AnalysisPage() {
     netProfit: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<string>('Loading...');
+  const [lastUpdated, setLastUpdated] = useState<string>('Never');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Initialize default data
-        await UserService.initializeDefaultData();
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('[ANALYSIS] Starting to fetch dashboard data...');
+      
+              // Initialize default data
+        await DataService.initializeDefaultData();
+        console.log('[ANALYSIS] Default data initialized');
         
         // Fetch real data from Firebase
-        const dashboardData = await UserService.getDashboardData();
+        const dashboardData = await DataService.getDashboardData();
+      console.log('[ANALYSIS] Dashboard data received:', dashboardData);
+      
+      // Calculate net profit
+      const netProfit = dashboardData.totalDeposits - dashboardData.totalWithdrawals;
+      console.log('[ANALYSIS] Calculated net profit:', netProfit);
+      
+      setStats({
+        totalUsers: dashboardData.totalUsers,
+        totalDeposits: dashboardData.totalDeposits,
+        totalWithdrawals: dashboardData.totalWithdrawals,
+        pendingApprovals: dashboardData.pendingApprovals,
+        netProfit: netProfit,
+      });
+
+      setDataSource('Firebase (Service)');
+      setLastUpdated(new Date().toLocaleString());
+      console.log('[ANALYSIS] Stats updated successfully');
+
+    } catch (error) {
+      console.error('[ANALYSIS] Error fetching data:', error);
+      
+      // Try to get data directly from Firebase collections
+      try {
+        console.log('[ANALYSIS] Attempting direct Firebase fetch...');
         
-        // Calculate net profit
-        const netProfit = dashboardData.totalDeposits - dashboardData.totalWithdrawals;
+        // Get users directly
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const users = usersSnapshot.docs.map(doc => doc.data());
+        console.log('[ANALYSIS] Direct users fetch:', users.length, 'users');
+        
+        // Get transactions directly
+        const transactionsSnapshot = await getDocs(collection(db, 'transactions'));
+        const transactions = transactionsSnapshot.docs.map(doc => doc.data());
+        console.log('[ANALYSIS] Direct transactions fetch:', transactions.length, 'transactions');
+        
+        const deposits = transactions.filter((t: any) => t.type === 'Deposit');
+        const withdrawals = transactions.filter((t: any) => t.type === 'Withdrawal');
+        
+        const totalDeposits = deposits
+          .filter((d: any) => d.status === 'Completed')
+          .reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+        const totalWithdrawals = withdrawals
+          .filter((w: any) => w.status === 'Completed')
+          .reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+        const netProfit = totalDeposits - totalWithdrawals;
+        
+        console.log('[ANALYSIS] Direct calculation results:', {
+          totalUsers: users.length,
+          totalDeposits,
+          totalWithdrawals,
+          netProfit,
+          pendingApprovals: deposits.filter((d: any) => d.status === 'Pending').length
+        });
         
         setStats({
-          totalUsers: dashboardData.totalUsers,
-          totalDeposits: dashboardData.totalDeposits,
-          totalWithdrawals: dashboardData.totalWithdrawals,
-          pendingApprovals: dashboardData.pendingApprovals,
+          totalUsers: users.length,
+          totalDeposits: totalDeposits,
+          totalWithdrawals: totalWithdrawals,
+          pendingApprovals: deposits.filter((d: any) => d.status === 'Pending').length,
           netProfit: netProfit,
         });
-
-      } catch (error) {
-        console.error('Error fetching data:', error);
+        
+        setDataSource('Firebase (Direct)');
+        setLastUpdated(new Date().toLocaleString());
+        
+      } catch (directError) {
+        console.error('[ANALYSIS] Direct fetch also failed:', directError);
+        
         // Fallback to localStorage
         const allUsers = JSON.parse(localStorage.getItem('globalAppUsers') || '[]');
         const allDeposits: any[] = JSON.parse(localStorage.getItem('globalTransactions') || '[]');
@@ -71,6 +130,13 @@ export default function AnalysisPage() {
         const totalWithdrawals = 0;
         const netProfit = totalDeposits - totalWithdrawals;
 
+        console.log('[ANALYSIS] Using localStorage fallback:', {
+          totalUsers: allUsers.length,
+          totalDeposits,
+          totalWithdrawals,
+          netProfit
+        });
+
         setStats({
           totalUsers: allUsers.length,
           totalDeposits: totalDeposits,
@@ -78,11 +144,16 @@ export default function AnalysisPage() {
           pendingApprovals: allDeposits.filter((d: any) => d.status === 'Pending').length,
           netProfit: netProfit,
         });
-      } finally {
-        setIsLoading(false);
+        
+        setDataSource('localStorage (Fallback)');
+        setLastUpdated(new Date().toLocaleString());
       }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
     
     const interval = setInterval(fetchData, 10000); // Refresh data every 10 seconds
@@ -229,6 +300,24 @@ export default function AnalysisPage() {
             The platform currently has <strong>{stats.totalUsers}</strong> registered users with a total revenue of <strong>₦{stats.totalDeposits.toLocaleString()}</strong>. 
             The net profit stands at <strong className={stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>₦{stats.netProfit.toLocaleString()}</strong>.
             {stats.pendingApprovals > 0 && ` There are ${stats.pendingApprovals} pending deposits awaiting approval.`}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Debug Section */}
+      <Card className="bg-card/50 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            Data Source & Last Updated
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Data Source: <strong>{dataSource}</strong>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Last Updated: <strong>{lastUpdated}</strong>
           </p>
         </CardContent>
       </Card>
