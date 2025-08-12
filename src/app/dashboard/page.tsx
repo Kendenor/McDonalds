@@ -19,7 +19,8 @@ import {
   Send,
   Star,
   CalendarCheck,
-  Lock
+  Lock,
+  Trophy
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -33,6 +34,7 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { UserService, TransactionService, ProductService, InvestmentPlanService } from '@/lib/user-service';
+import { ProductInventoryService } from '@/lib/product-inventory-service';
 import { SettingsService } from '@/lib/firebase-service';
 
 function McDonaldLogo({ className }: { className?: string }) {
@@ -179,6 +181,8 @@ function ProductCard({
 }) {
   const [remainingDays, setRemainingDays] = useState<number>(0);
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [availability, setAvailability] = useState<{ available: number; total: number }>({ available: 0, total: 0 });
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
 
   useEffect(() => {
     // Calculate remaining days based on product cycle
@@ -196,6 +200,32 @@ function ProductCard({
       setIsExpired(false);
     }
   }, [product.cycleDays]);
+
+  useEffect(() => {
+    // Load product availability for Special and Premium products
+    const loadAvailability = async () => {
+      if (product.id.startsWith('special') || product.id.startsWith('premium')) {
+        try {
+          const productType = product.id.startsWith('special') ? 'special' : 'premium';
+          const avail = await ProductInventoryService.getProductAvailability(product.id, productType);
+          setAvailability(avail);
+        } catch (error) {
+          console.error('Error loading availability:', error);
+        } finally {
+          setIsLoadingAvailability(false);
+        }
+      } else {
+        // Basic products are always available
+        setAvailability({ available: 999, total: 999 });
+        setIsLoadingAvailability(false);
+      }
+    };
+
+    loadAvailability();
+  }, [product.id]);
+
+  const isSoldOut = availability.available <= 0;
+  const isProductLocked = (product.id.startsWith('basic') || product.id.startsWith('premium')) && isExpired;
 
   return (
     <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground overflow-hidden">
@@ -224,6 +254,14 @@ function ProductCard({
             {remainingDays}d left
           </div>
         )}
+        {isSoldOut && (
+          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
+            <div className="text-white text-center">
+              <div className="text-lg font-bold">SOLD OUT</div>
+              <div className="text-sm">No more available</div>
+            </div>
+          </div>
+        )}
       </div>
       <CardContent className="p-4">
         <h3 className="font-bold text-lg mb-2">{product.name}</h3>
@@ -248,13 +286,28 @@ function ProductCard({
             <span className="text-muted-foreground">Cycle:</span>
             <span className="font-semibold">{product.cycleDays} days</span>
           </div>
+          {(product.id.startsWith('special') || product.id.startsWith('premium')) && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Available:</span>
+              {isLoadingAvailability ? (
+                <span className="text-xs text-muted-foreground">Loading...</span>
+              ) : (
+                <span className={`font-semibold ${isSoldOut ? 'text-red-500' : 'text-green-500'}`}>
+                  {availability.available}/{availability.total}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <Button 
           onClick={() => onInvest(product)} 
           className="w-full mt-4"
-          disabled={isExpired}
+          disabled={isExpired || isSoldOut || isProductLocked}
         >
-          {isExpired ? 'Expired - Purchase Again' : 'Invest Now'}
+          {isExpired ? 'Expired - Purchase Again' : 
+           isSoldOut ? 'Sold Out' : 
+           isProductLocked ? 'Locked Until Cycle Ends' : 
+           'Invest Now'}
         </Button>
       </CardContent>
     </Card>
@@ -333,6 +386,21 @@ export default function DashboardPage() {
         return;
     }
 
+    // Check product availability for Special and Premium products
+    if (product.id.startsWith('special') || product.id.startsWith('premium')) {
+        const productType = product.id.startsWith('special') ? 'special' : 'premium';
+        const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
+        
+        if (!isAvailable) {
+            toast({ 
+                variant: "destructive", 
+                title: "Product Unavailable", 
+                description: "This product is currently sold out. Please try again later or contact admin."
+            });
+            return;
+        }
+    }
+
     try {
         // Update user balance in Firebase
         const newBalance = currentBalance - product.price;
@@ -387,6 +455,12 @@ export default function DashboardPage() {
             totalEarned: 0,
             isLocked: planType === 'Basic' || planType === 'Premium'
         });
+
+        // Decrease product availability for Special and Premium products
+        if (product.id.startsWith('special') || product.id.startsWith('premium')) {
+            const productType = product.id.startsWith('special') ? 'special' : 'premium';
+            await ProductInventoryService.decreaseAvailability(product.id, productType);
+        }
 
         // Update canAccessSpecialPlans if this is a basic plan
         if (planType === 'Basic') {
@@ -587,7 +661,7 @@ export default function DashboardPage() {
         />
       </div>
 
-       <div className="grid grid-cols-4 gap-4">
+               <div className="grid grid-cols-5 gap-4">
           <Link href="/dashboard/recharge" className="block">
              <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
               <div className="bg-primary text-primary-foreground p-3 rounded-xl">
@@ -610,6 +684,14 @@ export default function DashboardPage() {
                 <BarChart2 size={24} />
               </div>
               <p className="font-medium text-sm">Earnings</p>
+            </Card>
+          </Link>
+           <Link href="/dashboard/tasks" className="block">
+             <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
+              <div className="bg-primary text-primary-foreground p-3 rounded-xl">
+                <Trophy size={24} />
+              </div>
+              <p className="font-medium text-sm">Tasks</p>
             </Card>
           </Link>
            <Link href="/dashboard/share" className="block">

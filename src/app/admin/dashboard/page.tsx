@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Users, DollarSign, ArrowDownUp, Bell, ArrowUp, ArrowDown, UserPlus } from "lucide-react"
+import { Users, DollarSign, ArrowDownUp, Bell, ArrowUp, ArrowDown, UserPlus, RefreshCw, Package, TrendingUp } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -17,16 +17,19 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"
 import { Loader } from "lucide-react"
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { DataService } from '@/lib/user-service';
+import { ProductInventoryService } from '@/lib/product-inventory-service';
+import { useToast } from '@/hooks/use-toast';
 
 interface Transaction {
     id: string;
     userEmail: string;
-    type: 'Deposit' | 'Withdrawal' | 'Investment' | 'Admin_Add' | 'Admin_Deduct';
+    type: 'Deposit' | 'Withdrawal' | 'Investment' | 'Admin_Add' | 'Admin_Deduct' | 'Referral_Bonus';
     amount: number;
     status: 'Completed' | 'Pending' | 'Failed';
     date: string;
@@ -57,14 +60,17 @@ function StatCard({ title, value, icon, description }: { title: string, value: s
 
 export default function AdminDashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
+    const [isRestoring, setIsRestoring] = useState(false);
     const [stats, setStats] = useState({
         totalUsers: 0,
         totalDeposits: 0,
         totalWithdrawals: 0,
         pendingApprovals: 0,
+        netProfit: 0,
     });
     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
     const [recentUsers, setRecentUsers] = useState<AppUser[]>([]);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -73,14 +79,21 @@ export default function AdminDashboardPage() {
                 // Initialize default data if needed
                 await DataService.initializeDefaultData();
                 
+                // Initialize product inventory
+                await ProductInventoryService.initializeInventory();
+                
                 // Fetch real data from Firebase
                 const dashboardData = await DataService.getDashboardData();
+                
+                // Calculate net profit
+                const netProfit = dashboardData.totalDeposits - dashboardData.totalWithdrawals;
                 
                 setStats({
                     totalUsers: dashboardData.totalUsers,
                     totalDeposits: dashboardData.totalDeposits,
                     totalWithdrawals: dashboardData.totalWithdrawals,
                     pendingApprovals: dashboardData.pendingApprovals,
+                    netProfit: netProfit,
                 });
                 
                 // Deduplicate transactions to prevent React key errors
@@ -96,11 +109,16 @@ export default function AdminDashboardPage() {
                 const allUsers = JSON.parse(localStorage.getItem('globalAppUsers') || '[]');
                 const allDeposits: any[] = JSON.parse(localStorage.getItem('globalTransactions') || '[]');
 
-            setStats({
+                const totalDeposits = allDeposits.filter((d: any) => d.status === 'Completed').reduce((sum: number, d: any) => sum + parseFloat(d.amount.replace(/[^0-9.-]+/g,"")), 0);
+                const totalWithdrawals = 0;
+                const netProfit = totalDeposits - totalWithdrawals;
+
+                setStats({
                     totalUsers: allUsers.length,
-                    totalDeposits: allDeposits.filter((d: any) => d.status === 'Completed').reduce((sum: number, d: any) => sum + parseFloat(d.amount.replace(/[^0-9.-]+/g,"")), 0),
-                    totalWithdrawals: 0,
+                    totalDeposits: totalDeposits,
+                    totalWithdrawals: totalWithdrawals,
                     pendingApprovals: allDeposits.filter((d: any) => d.status === 'Pending').length,
+                    netProfit: netProfit,
                 });
             
                 setRecentTransactions(allDeposits.slice(0, 5));
@@ -116,6 +134,26 @@ export default function AdminDashboardPage() {
         return () => clearInterval(interval);
     }, []);
 
+    const handleRestoreInventory = async (productType: 'special' | 'premium') => {
+        setIsRestoring(true);
+        try {
+            await ProductInventoryService.restoreInventory(productType);
+            toast({
+                title: "Inventory Restored!",
+                description: `${productType.charAt(0).toUpperCase() + productType.slice(1)} products have been restored to full availability.`,
+            });
+        } catch (error) {
+            console.error('Error restoring inventory:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to restore inventory. Please try again.",
+            });
+        } finally {
+            setIsRestoring(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-48">
@@ -126,7 +164,47 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Restore Inventory Section */}
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-700/40">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Package className="text-blue-600" />
+                    Product Inventory Management
+                </CardTitle>
+                <CardDescription>
+                    Restore Special and Premium products to full availability
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex gap-4">
+                <Button 
+                    onClick={() => handleRestoreInventory('special')}
+                    disabled={isRestoring}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                    {isRestoring ? (
+                        <Loader className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Restore Special Products
+                </Button>
+                <Button 
+                    onClick={() => handleRestoreInventory('premium')}
+                    disabled={isRestoring}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                    {isRestoring ? (
+                        <Loader className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Restore Premium Products
+                </Button>
+            </CardContent>
+        </Card>
+
+        {/* Analytics Dashboard */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatCard 
                 title="Total Users" 
                 value={stats.totalUsers.toLocaleString()}
@@ -139,13 +217,19 @@ export default function AdminDashboardPage() {
                 description="Sum of all completed deposits"
                 icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} 
             />
-             <StatCard 
+            <StatCard 
                 title="Total Withdrawals" 
                 value={`₦${stats.totalWithdrawals.toLocaleString()}`}
                 description="Sum of all completed withdrawals"
                 icon={<ArrowDownUp className="h-4 w-4 text-muted-foreground" />} 
             />
-             <StatCard 
+            <StatCard 
+                title="Net Profit" 
+                value={`₦${stats.netProfit.toLocaleString()}`}
+                description="Total deposits minus withdrawals"
+                icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} 
+            />
+            <StatCard 
                 title="Pending Deposits" 
                 value={stats.pendingApprovals.toString()}
                 description="Deposits waiting for action"
