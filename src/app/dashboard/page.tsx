@@ -209,7 +209,9 @@ function ProductCard({
       if (product.id.startsWith('special') || product.id.startsWith('premium')) {
         try {
           const productType = product.id.startsWith('special') ? 'special' : 'premium';
+          console.log(`Loading availability for ${product.id} (${productType})`);
           const avail = await ProductInventoryService.getProductAvailability(product.id, productType);
+          console.log(`Availability for ${product.id}:`, avail);
           setAvailability(avail);
         } catch (error) {
           console.error('Error loading availability:', error);
@@ -461,12 +463,15 @@ export default function DashboardPage() {
         // Decrease product availability for Special and Premium products
         if (product.id.startsWith('special') || product.id.startsWith('premium')) {
             const productType = product.id.startsWith('special') ? 'special' : 'premium';
+            console.log(`Before purchase - checking availability for ${product.id} (${productType})`);
+            
             const success = await ProductInventoryService.decreaseAvailability(product.id, productType);
             
             if (success) {
                 console.log(`Successfully decreased availability for ${product.id}`);
                 // Refresh the availability display
-                refreshAvailability();
+                await refreshAvailability();
+                console.log(`After refresh - availability updated for ${product.id}`);
             } else {
                 console.error(`Failed to decrease availability for ${product.id}`);
             }
@@ -546,11 +551,6 @@ export default function DashboardPage() {
   const [canAccessSpecialPlans, setCanAccessSpecialPlans] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // Function to refresh product availability
-  const refreshAvailability = useCallback(() => {
-    setRefreshKey(prev => prev + 1);
-  }, []);
 
   // Check if user can check in (24-hour cooldown)
   const canCheckIn = useMemo(() => {
@@ -655,6 +655,12 @@ export default function DashboardPage() {
       setIsLoadingProducts(false);
     }
   }, [user]);
+
+  // Function to refresh product availability
+  const refreshAvailability = useCallback(async () => {
+    // Force reload of products to get updated availability
+    await loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     console.log('useEffect triggered - user:', user?.uid, 'userData:', !!userData);
