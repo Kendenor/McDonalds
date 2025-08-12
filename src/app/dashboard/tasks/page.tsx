@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, Gift, Target, Trophy, Loader, RefreshCw, TrendingUp, Share2, BookOpen, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { TaskService } from '@/lib/task-service';
 import { UserService } from '@/lib/user-service';
 import { TransactionService } from '@/lib/user-service';
@@ -24,7 +24,7 @@ interface Task {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleting, setIsCompleting] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<{ completed: number; total: number; totalReward: number }>({ completed: 0, total: 0, totalReward: 0 });
