@@ -467,6 +467,20 @@ export default function DashboardPage() {
             const productType = product.id.startsWith('special') ? 'special' : 'premium';
             console.log(`Before purchase - checking availability for ${product.id} (${productType})`);
             
+            // Ensure inventory is initialized first
+            try {
+                await ProductInventoryService.initializeInventory();
+                console.log(`Inventory initialized for ${productType}`);
+            } catch (initError) {
+                console.error(`Failed to initialize inventory:`, initError);
+                toast({ 
+                    variant: "destructive", 
+                    title: "System Error", 
+                    description: "Failed to initialize product inventory. Please try again."
+                });
+                return;
+            }
+            
             // Check if product is still available before purchase
             const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
             if (!isAvailable) {
@@ -481,12 +495,12 @@ export default function DashboardPage() {
             const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
             
             if (success) {
-                console.log(`Successfully decreased availability for ${product.id}`);
+                console.log(`Successfully increased purchased count for ${product.id}`);
                 // Refresh the availability display
                 await refreshAvailability();
                 console.log(`After refresh - availability updated for ${product.id}`);
             } else {
-                console.error(`Failed to decrease availability for ${product.id}`);
+                console.error(`Failed to increase purchased count for ${product.id}`);
                 toast({ 
                     variant: "destructive", 
                     title: "Error", 

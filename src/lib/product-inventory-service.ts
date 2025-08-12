@@ -101,9 +101,12 @@ export class ProductInventoryService {
     try {
       console.log(`Attempting to increase purchased count for ${productId} (${productType})`);
       
+      // First, ensure inventory is initialized
+      await this.initializeInventory();
+      
       const inventoryDoc = await getDoc(doc(db, this.COLLECTION, productType));
       if (!inventoryDoc.exists()) {
-        console.error(`Inventory document for ${productType} does not exist`);
+        console.error(`Inventory document for ${productType} does not exist after initialization`);
         return false;
       }
 
@@ -165,6 +168,9 @@ export class ProductInventoryService {
       return false;
     }
     try {
+      // Ensure inventory is initialized first
+      await this.initializeInventory();
+      
       const inventory = await this.getInventory(productType);
       const product = inventory[productId];
       return product ? product.purchased < product.total : false;
@@ -181,6 +187,9 @@ export class ProductInventoryService {
       return { purchased: 0, total: 0 };
     }
     try {
+      // Ensure inventory is initialized first
+      await this.initializeInventory();
+      
       const inventory = await this.getInventory(productType);
       const product = inventory[productId];
       return product ? { purchased: product.purchased, total: product.total } : { purchased: 0, total: 0 };
