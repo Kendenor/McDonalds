@@ -113,7 +113,7 @@ export default function AdminDashboardPage() {
                 const totalWithdrawals = 0;
                 const netProfit = totalDeposits - totalWithdrawals;
 
-                setStats({
+            setStats({
                     totalUsers: allUsers.length,
                     totalDeposits: totalDeposits,
                     totalWithdrawals: totalWithdrawals,
@@ -154,45 +154,9 @@ export default function AdminDashboardPage() {
         }
     };
 
-    const handleForceResetInventory = async () => {
-        setIsRestoring(true);
-        try {
-            await ProductInventoryService.forceResetInventory();
-            toast({
-                title: "Inventory Reset!",
-                description: "Product inventory has been forcefully reset to its initial state.",
-            });
-        } catch (error) {
-            console.error('Error force resetting inventory:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to force reset inventory. Please try again.",
-            });
-        } finally {
-            setIsRestoring(false);
-        }
-    };
 
-    const handleTestInventory = async () => {
-        setIsRestoring(true);
-        try {
-            await ProductInventoryService.testInventory();
-            toast({
-                title: "Inventory Tested!",
-                description: "Product inventory system has been manually tested.",
-            });
-        } catch (error) {
-            console.error('Error testing inventory:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to test inventory. Please check console for details.",
-            });
-        } finally {
-            setIsRestoring(false);
-        }
-    };
+
+
 
     if (isLoading) {
         return (
@@ -240,32 +204,8 @@ export default function AdminDashboardPage() {
                     )}
                     Restore Premium Products
                 </Button>
-                <Button 
-                    onClick={handleForceResetInventory}
-                    disabled={isRestoring}
-                    variant="outline"
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                >
-                    {isRestoring ? (
-                        <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                    )}
-                    Force Reset Inventory (Debug)
-                </Button>
-                <Button 
-                    onClick={handleTestInventory}
-                    disabled={isRestoring}
-                    variant="outline"
-                    className="border-green-300 text-green-600 hover:bg-green-50"
-                >
-                    {isRestoring ? (
-                        <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                    )}
-                    Test Inventory System
-                </Button>
+
+
             </CardContent>
         </Card>
 
@@ -283,7 +223,7 @@ export default function AdminDashboardPage() {
                 description="Sum of all completed deposits"
                 icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} 
             />
-            <StatCard 
+             <StatCard 
                 title="Total Withdrawals" 
                 value={`₦${stats.totalWithdrawals.toLocaleString()}`}
                 description="Sum of all completed withdrawals"
@@ -295,7 +235,7 @@ export default function AdminDashboardPage() {
                 description="Total deposits minus withdrawals"
                 icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} 
             />
-            <StatCard 
+             <StatCard 
                 title="Pending Deposits" 
                 value={stats.pendingApprovals.toString()}
                 description="Deposits waiting for action"
