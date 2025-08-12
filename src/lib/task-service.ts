@@ -54,38 +54,14 @@ export class TaskService {
       const existingTasks = await this.getUserTasks(userId);
       if (existingTasks.length > 0) return;
 
-      // Create default daily tasks
+      // Create real daily tasks for users
       const dailyTasks = [
         {
           userId,
           dateKey: today,
           taskType: 'daily_checkin',
           title: 'Daily Check-in',
-          description: 'Check in to earn daily bonus',
-          reward: 50,
-          completed: false,
-          maxCompletions: 1,
-          completionsToday: 0,
-          createdAt: serverTimestamp()
-        },
-        {
-          userId,
-          dateKey: today,
-          taskType: 'claim_earnings',
-          title: 'Claim Daily Earnings',
-          description: 'Claim earnings from your active investments',
-          reward: 25,
-          completed: false,
-          maxCompletions: 1,
-          completionsToday: 0,
-          createdAt: serverTimestamp()
-        },
-        {
-          userId,
-          dateKey: today,
-          taskType: 'refer_friend',
-          title: 'Refer a Friend',
-          description: 'Share your referral link with friends',
+          description: 'Check in to earn daily bonus and maintain your streak',
           reward: 100,
           completed: false,
           maxCompletions: 1,
@@ -95,12 +71,60 @@ export class TaskService {
         {
           userId,
           dateKey: today,
+          taskType: 'view_earnings',
+          title: 'View Your Earnings',
+          description: 'Check your investment earnings and track your progress',
+          reward: 50,
+          completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
+          createdAt: serverTimestamp()
+        },
+        {
+          userId,
+          dateKey: today,
+          taskType: 'share_platform',
+          title: 'Share Platform',
+          description: 'Share our platform with friends and earn referral bonus',
+          reward: 150,
+          completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
+          createdAt: serverTimestamp()
+        },
+        {
+          userId,
+          dateKey: today,
           taskType: 'product_daily_task',
-          title: 'Product Daily Task',
-          description: 'Complete daily task for your purchased products (5 times daily)',
-          reward: 200,
+          title: 'Investment Daily Task',
+          description: 'Complete daily investment task for your purchased products (5 times daily)',
+          reward: 300,
           completed: false,
           maxCompletions: 5,
+          completionsToday: 0,
+          createdAt: serverTimestamp()
+        },
+        {
+          userId,
+          dateKey: today,
+          taskType: 'read_news',
+          title: 'Read Investment News',
+          description: 'Stay updated with latest investment news and market trends',
+          reward: 75,
+          completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
+          createdAt: serverTimestamp()
+        },
+        {
+          userId,
+          dateKey: today,
+          taskType: 'update_profile',
+          title: 'Update Profile',
+          description: 'Keep your profile information up to date',
+          reward: 80,
+          completed: false,
+          maxCompletions: 1,
           completionsToday: 0,
           createdAt: serverTimestamp()
         }

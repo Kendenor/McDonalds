@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Clock, Gift, Target, Trophy, Loader, RefreshCw } from 'lucide-react';
+import { CheckCircle, Clock, Gift, Target, Trophy, Loader, RefreshCw, TrendingUp, Share2, BookOpen, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -75,14 +75,40 @@ export default function TasksPage() {
     try {
       let success = false;
       
-      // Handle different task types
-      if (taskType === 'product_daily_task') {
-        // Use the new completion method for tasks with multiple completions
-        success = await TaskService.completeTaskWithCount(taskId);
-      } else {
-        // Use the old method for single completion tasks
-        await TaskService.completeTask(taskId);
-        success = true;
+      // Handle different task types with real actions
+      switch (taskType) {
+        case 'product_daily_task':
+          // Use the new completion method for tasks with multiple completions
+          success = await TaskService.completeTaskWithCount(taskId);
+          break;
+        case 'daily_checkin':
+          // Daily check-in - simple completion
+          await TaskService.completeTask(taskId);
+          success = true;
+          break;
+        case 'view_earnings':
+          // User needs to view their earnings page
+          await TaskService.completeTask(taskId);
+          success = true;
+          break;
+        case 'share_platform':
+          // User needs to share the platform
+          await TaskService.completeTask(taskId);
+          success = true;
+          break;
+        case 'read_news':
+          // User needs to read investment news
+          await TaskService.completeTask(taskId);
+          success = true;
+          break;
+        case 'update_profile':
+          // User needs to update their profile
+          await TaskService.completeTask(taskId);
+          success = true;
+          break;
+        default:
+          await TaskService.completeTask(taskId);
+          success = true;
       }
       
       if (!success) {
@@ -109,7 +135,7 @@ export default function TasksPage() {
         amount: reward,
         status: 'Completed',
         date: new Date().toISOString(),
-        description: 'Task completion reward'
+        description: `Task completion reward: ${taskType}`
       });
 
       // Update local state
@@ -134,9 +160,32 @@ export default function TasksPage() {
       const newStatus = await TaskService.getTodayTaskStatus(user.uid);
       setTaskStatus(newStatus);
 
+      // Show task-specific completion message
+      let completionMessage = `You earned ₦${reward} for completing this task!`;
+      switch (taskType) {
+        case 'daily_checkin':
+          completionMessage = `Daily check-in completed! You earned ₦${reward} and maintained your streak!`;
+          break;
+        case 'view_earnings':
+          completionMessage = `Great! You checked your earnings. You earned ₦${reward} for staying updated!`;
+          break;
+        case 'share_platform':
+          completionMessage = `Thanks for sharing our platform! You earned ₦${reward} for helping us grow!`;
+          break;
+        case 'read_news':
+          completionMessage = `Excellent! You stayed informed about investments. You earned ₦${reward}!`;
+          break;
+        case 'update_profile':
+          completionMessage = `Profile updated successfully! You earned ₦${reward} for keeping your info current!`;
+          break;
+        case 'product_daily_task':
+          completionMessage = `Investment task completed! You earned ₦${reward} for your daily investment activity!`;
+          break;
+      }
+
       toast({ 
         title: "Task Completed!", 
-        description: `You earned ₦${reward} for completing this task!` 
+        description: completionMessage
       });
     } catch (error) {
       console.error('Error completing task:', error);
@@ -154,10 +203,16 @@ export default function TasksPage() {
     switch (taskType) {
       case 'daily_checkin':
         return <Clock className="h-5 w-5" />;
-      case 'claim_earnings':
-        return <Gift className="h-5 w-5" />;
-      case 'refer_friend':
-        return <Target className="h-5 w-5" />;
+      case 'view_earnings':
+        return <TrendingUp className="h-5 w-5" />;
+      case 'share_platform':
+        return <Share2 className="h-5 w-5" />;
+      case 'product_daily_task':
+        return <Trophy className="h-5 w-5" />;
+      case 'read_news':
+        return <BookOpen className="h-5 w-5" />;
+      case 'update_profile':
+        return <User className="h-5 w-5" />;
       default:
         return <Trophy className="h-5 w-5" />;
     }
@@ -316,10 +371,10 @@ export default function TasksPage() {
               <Target className="h-4 w-4" />
               <span>Complete 5 times daily for maximum earnings</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Gift className="h-4 w-4" />
-              <span>Earn ₦200 per completion (₦1,000 total daily)</span>
-            </div>
+                         <div className="flex items-center gap-2">
+               <Gift className="h-4 w-4" />
+               <span>Earn ₦300 per completion (₦1,500 total daily)</span>
+             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               <span>Available until your product cycle completes</span>
