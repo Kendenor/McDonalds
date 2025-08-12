@@ -18,7 +18,7 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { Home, Users, Settings, LogOut, Shield, DollarSign, ArrowDownUp, Megaphone, Loader, Bell } from 'lucide-react';
+import { Home, Users, Settings, LogOut, Shield, DollarSign, ArrowDownUp, Megaphone, Loader, Bell, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -232,6 +232,14 @@ export default function AdminDashboardLayout({
                                 <Link href="/admin/dashboard/announcements">
                                     <Megaphone/>
                                     Announcements
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton asChild onClick={() => setPageTitle('Analysis')}>
+                                <Link href="/admin/dashboard/analysis">
+                                    <BarChart3/>
+                                    Analysis
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
