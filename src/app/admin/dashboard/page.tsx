@@ -174,6 +174,26 @@ export default function AdminDashboardPage() {
         }
     };
 
+    const handleTestInventory = async () => {
+        setIsRestoring(true);
+        try {
+            await ProductInventoryService.testInventory();
+            toast({
+                title: "Inventory Tested!",
+                description: "Product inventory system has been manually tested.",
+            });
+        } catch (error) {
+            console.error('Error testing inventory:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to test inventory. Please check console for details.",
+            });
+        } finally {
+            setIsRestoring(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-48">
@@ -232,6 +252,19 @@ export default function AdminDashboardPage() {
                         <RefreshCw className="mr-2 h-4 w-4" />
                     )}
                     Force Reset Inventory (Debug)
+                </Button>
+                <Button 
+                    onClick={handleTestInventory}
+                    disabled={isRestoring}
+                    variant="outline"
+                    className="border-green-300 text-green-600 hover:bg-green-50"
+                >
+                    {isRestoring ? (
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Test Inventory System
                 </Button>
             </CardContent>
         </Card>

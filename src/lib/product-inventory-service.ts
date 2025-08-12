@@ -141,7 +141,9 @@ export class ProductInventoryService {
       await this.initializeInventory();
       console.log(`[DEBUG] Inventory initialization completed`);
       
-      const inventoryDoc = await getDoc(doc(db, this.COLLECTION, productType));
+      // Get the inventory document
+      const inventoryRef = doc(db, this.COLLECTION, productType);
+      const inventoryDoc = await getDoc(inventoryRef);
       console.log(`[DEBUG] Inventory document exists: ${inventoryDoc.exists()}`);
       
       if (!inventoryDoc.exists()) {
@@ -168,11 +170,17 @@ export class ProductInventoryService {
       }
 
       const oldPurchased = inventory[productId].purchased;
-      inventory[productId].purchased += 1;
+      const newPurchased = oldPurchased + 1;
       
-      console.log(`[DEBUG] Increasing ${productId} purchased count from ${oldPurchased} to ${inventory[productId].purchased}`);
+      console.log(`[DEBUG] Increasing ${productId} purchased count from ${oldPurchased} to ${newPurchased}`);
       
-      await setDoc(doc(db, this.COLLECTION, productType), inventory);
+      // Use updateDoc to update only the specific product field
+      const updateData = {
+        [`${productId}.purchased`]: newPurchased
+      };
+      
+      console.log(`[DEBUG] Update data:`, updateData);
+      await updateDoc(inventoryRef, updateData);
       console.log(`[DEBUG] Successfully updated inventory for ${productId}`);
       
       return true;
@@ -195,19 +203,23 @@ export class ProductInventoryService {
       return;
     }
     try {
-      const inventoryDoc = await getDoc(doc(db, this.COLLECTION, productType));
+      const inventoryRef = doc(db, this.COLLECTION, productType);
+      const inventoryDoc = await getDoc(inventoryRef);
       if (!inventoryDoc.exists()) return;
 
       const inventory = inventoryDoc.data() as Record<string, { purchased: number; total: number; name: string }>;
       
       // Reset all products purchased count to 0
+      const updateData: any = {};
       Object.keys(inventory).forEach(productId => {
-        inventory[productId].purchased = 0;
+        updateData[`${productId}.purchased`] = 0;
       });
 
-      await setDoc(doc(db, this.COLLECTION, productType), inventory);
+      await updateDoc(inventoryRef, updateData);
+      console.log(`[DEBUG] Successfully restored ${productType} inventory`);
     } catch (error) {
       console.error('Error restoring inventory:', error);
+      throw error;
     }
   }
 
