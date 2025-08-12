@@ -64,6 +64,8 @@ export class TaskService {
           description: 'Check in to earn daily bonus',
           reward: 50,
           completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
           createdAt: serverTimestamp()
         },
         {
@@ -74,6 +76,8 @@ export class TaskService {
           description: 'Claim earnings from your active investments',
           reward: 25,
           completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
           createdAt: serverTimestamp()
         },
         {
@@ -84,6 +88,20 @@ export class TaskService {
           description: 'Share your referral link with friends',
           reward: 100,
           completed: false,
+          maxCompletions: 1,
+          completionsToday: 0,
+          createdAt: serverTimestamp()
+        },
+        {
+          userId,
+          dateKey: today,
+          taskType: 'product_daily_task',
+          title: 'Product Daily Task',
+          description: 'Complete daily task for your purchased products (5 times daily)',
+          reward: 200,
+          completed: false,
+          maxCompletions: 5,
+          completionsToday: 0,
           createdAt: serverTimestamp()
         }
       ];
@@ -114,6 +132,41 @@ export class TaskService {
     }
   }
 
+  // Complete a task with multiple completions allowed
+  static async completeTaskWithCount(taskId: string): Promise<boolean> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot complete task');
+      return false;
+    }
+    try {
+      const taskDoc = doc(db, this.COLLECTION, taskId);
+      const taskData = (await getDoc(taskDoc)).data();
+      
+      if (!taskData) return false;
+      
+      const currentCompletions = taskData.completionsToday || 0;
+      const maxCompletions = taskData.maxCompletions || 1;
+      
+      if (currentCompletions >= maxCompletions) {
+        return false; // Already completed maximum times
+      }
+      
+      const newCompletions = currentCompletions + 1;
+      const isFullyCompleted = newCompletions >= maxCompletions;
+      
+      await updateDoc(taskDoc, {
+        completionsToday: newCompletions,
+        completed: isFullyCompleted,
+        completedAt: isFullyCompleted ? serverTimestamp() : null
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error completing task with count:', error);
+      return false;
+    }
+  }
+
   // Get task completion status for today
   static async getTodayTaskStatus(userId: string): Promise<{ completed: number; total: number; totalReward: number }> {
     if (!isClientSide()) {
@@ -124,12 +177,39 @@ export class TaskService {
       const tasks = await this.getUserTasks(userId);
       const completed = tasks.filter(task => task.completed).length;
       const total = tasks.length;
-      const totalReward = tasks.reduce((sum, task) => sum + (task.completed ? task.reward : 0), 0);
+      const totalReward = tasks.reduce((sum, task) => {
+        if (task.completed) {
+          return sum + (task.reward * (task.maxCompletions || 1));
+        }
+        return sum + (task.reward * (task.completionsToday || 0));
+      }, 0);
       
       return { completed, total, totalReward };
     } catch (error) {
       console.error('Error getting task status:', error);
       return { completed: 0, total: 0, totalReward: 0 };
+    }
+  }
+
+  // Check if user has active products for product daily task
+  static async hasActiveProducts(userId: string): Promise<boolean> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot check active products');
+      return false;
+    }
+    try {
+      // Import ProductService to check for active products
+      const { ProductService } = await import('./user-service');
+      const userProducts = await ProductService.getUserProducts(userId);
+      
+      // Check if user has any active products
+      const hasActive = userProducts.some(product => product.status === 'Active');
+      console.log(`User ${userId} has active products:`, hasActive);
+      
+      return hasActive;
+    } catch (error) {
+      console.error('Error checking active products:', error);
+      return false;
     }
   }
 }
