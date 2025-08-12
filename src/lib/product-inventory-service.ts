@@ -34,7 +34,7 @@ export class ProductInventoryService {
         return; // Already initialized
       }
 
-      // Special products inventory
+      // Special products inventory - Updated with correct initial values
       const specialInventory = {
         'special-1': { available: 300, total: 300, name: 'Special 1' },
         'special-2': { available: 250, total: 250, name: 'Special 2' },

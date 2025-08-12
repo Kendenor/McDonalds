@@ -175,11 +175,13 @@ function InfoPopup({ open, onOpenChange }: { open: boolean, onOpenChange: (open:
 function ProductCard({
   product,
   onInvest,
-  refreshAvailability
+  refreshAvailability,
+  refreshKey
 }: {
   product: { id: string; name: string; price: number; daily: number; total: number; days: number; imageUrl: string; dailyROI: number; cycleDays: number; };
   onInvest: (product: any) => void;
   refreshAvailability: () => void;
+  refreshKey: number;
 }) {
   const [remainingDays, setRemainingDays] = useState<number>(0);
   const [isExpired, setIsExpired] = useState<boolean>(false);
@@ -209,7 +211,7 @@ function ProductCard({
       if (product.id.startsWith('special') || product.id.startsWith('premium')) {
         try {
           const productType = product.id.startsWith('special') ? 'special' : 'premium';
-          console.log(`Loading availability for ${product.id} (${productType})`);
+          console.log(`Loading availability for ${product.id} (${productType}) - refreshKey: ${refreshKey}`);
           const avail = await ProductInventoryService.getProductAvailability(product.id, productType);
           console.log(`Availability for ${product.id}:`, avail);
           setAvailability(avail);
@@ -226,7 +228,7 @@ function ProductCard({
     };
 
     loadAvailability();
-  }, [product.id, refreshAvailability]);
+  }, [product.id, refreshKey]);
 
   const isSoldOut = availability.available <= 0;
   const isProductLocked = (product.id.startsWith('basic') || product.id.startsWith('premium')) && isExpired;
@@ -465,6 +467,17 @@ export default function DashboardPage() {
             const productType = product.id.startsWith('special') ? 'special' : 'premium';
             console.log(`Before purchase - checking availability for ${product.id} (${productType})`);
             
+            // Check if product is still available before purchase
+            const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
+            if (!isAvailable) {
+                toast({ 
+                    variant: "destructive", 
+                    title: "Product Unavailable", 
+                    description: "This product is no longer available. Please try another product."
+                });
+                return;
+            }
+            
             const success = await ProductInventoryService.decreaseAvailability(product.id, productType);
             
             if (success) {
@@ -474,6 +487,12 @@ export default function DashboardPage() {
                 console.log(`After refresh - availability updated for ${product.id}`);
             } else {
                 console.error(`Failed to decrease availability for ${product.id}`);
+                toast({ 
+                    variant: "destructive", 
+                    title: "Error", 
+                    description: "Failed to update product availability. Please try again."
+                });
+                return;
             }
         }
 
@@ -620,6 +639,9 @@ export default function DashboardPage() {
     try {
       console.log('Loading products...');
       
+      // Initialize inventory if not already done
+      await ProductInventoryService.initializeInventory();
+      
       // Check for expired products first
       await ProductService.checkAndResetExpiredProducts();
       
@@ -667,8 +689,11 @@ export default function DashboardPage() {
 
   // Function to refresh product availability
   const refreshAvailability = useCallback(async () => {
+    console.log('Refreshing availability...');
     // Force reload of products to get updated availability
     await loadProducts();
+    // Also force a re-render by updating the refresh key
+    setRefreshKey(prev => prev + 1);
   }, [loadProducts]);
 
   useEffect(() => {
@@ -810,7 +835,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.basic.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} refreshKey={refreshKey} />
                         ))
                     )}
                 </div>
@@ -828,7 +853,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.special.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} refreshKey={refreshKey} />
                         ))
                     )}
                 </div>
@@ -846,7 +871,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.premium.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} refreshKey={refreshKey} />
                         ))
                     )}
                 </div>
