@@ -99,17 +99,38 @@ export class ProductInventoryService {
       return false;
     }
     try {
+      console.log(`Attempting to decrease availability for ${productId} (${productType})`);
+      
       const inventoryDoc = await getDoc(doc(db, this.COLLECTION, productType));
-      if (!inventoryDoc.exists()) return false;
+      if (!inventoryDoc.exists()) {
+        console.error(`Inventory document for ${productType} does not exist`);
+        return false;
+      }
 
       const inventory = inventoryDoc.data() as Record<string, { available: number; total: number; name: string }>;
-      if (!inventory[productId] || inventory[productId].available <= 0) return false;
+      console.log(`Current inventory for ${productType}:`, inventory);
+      
+      if (!inventory[productId]) {
+        console.error(`Product ${productId} not found in ${productType} inventory`);
+        return false;
+      }
+      
+      if (inventory[productId].available <= 0) {
+        console.error(`Product ${productId} is already sold out (available: ${inventory[productId].available})`);
+        return false;
+      }
 
+      const oldAvailable = inventory[productId].available;
       inventory[productId].available -= 1;
+      
+      console.log(`Decreasing ${productId} availability from ${oldAvailable} to ${inventory[productId].available}`);
+      
       await setDoc(doc(db, this.COLLECTION, productType), inventory);
+      console.log(`Successfully updated inventory for ${productId}`);
+      
       return true;
     } catch (error) {
-      console.error('Error decreasing availability:', error);
+      console.error(`Error decreasing availability for ${productId}:`, error);
       return false;
     }
   }

@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -174,10 +174,12 @@ function InfoPopup({ open, onOpenChange }: { open: boolean, onOpenChange: (open:
 
 function ProductCard({
   product,
-  onInvest
+  onInvest,
+  refreshAvailability
 }: {
   product: { id: string; name: string; price: number; daily: number; total: number; days: number; imageUrl: string; dailyROI: number; cycleDays: number; };
   onInvest: (product: any) => void;
+  refreshAvailability: () => void;
 }) {
   const [remainingDays, setRemainingDays] = useState<number>(0);
   const [isExpired, setIsExpired] = useState<boolean>(false);
@@ -222,7 +224,7 @@ function ProductCard({
     };
 
     loadAvailability();
-  }, [product.id]);
+  }, [product.id, refreshAvailability]);
 
   const isSoldOut = availability.available <= 0;
   const isProductLocked = (product.id.startsWith('basic') || product.id.startsWith('premium')) && isExpired;
@@ -459,7 +461,15 @@ export default function DashboardPage() {
         // Decrease product availability for Special and Premium products
         if (product.id.startsWith('special') || product.id.startsWith('premium')) {
             const productType = product.id.startsWith('special') ? 'special' : 'premium';
-            await ProductInventoryService.decreaseAvailability(product.id, productType);
+            const success = await ProductInventoryService.decreaseAvailability(product.id, productType);
+            
+            if (success) {
+                console.log(`Successfully decreased availability for ${product.id}`);
+                // Refresh the availability display
+                refreshAvailability();
+            } else {
+                console.error(`Failed to decrease availability for ${product.id}`);
+            }
         }
 
         // Update canAccessSpecialPlans if this is a basic plan
@@ -535,6 +545,12 @@ export default function DashboardPage() {
   });
   const [canAccessSpecialPlans, setCanAccessSpecialPlans] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Function to refresh product availability
+  const refreshAvailability = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   // Check if user can check in (24-hour cooldown)
   const canCheckIn = useMemo(() => {
@@ -590,63 +606,63 @@ export default function DashboardPage() {
   }, [userData, canCheckIn]);
 
     // Load products and check access
+  const loadProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    try {
+      console.log('Loading products...');
+      
+      // Check for expired products first
+      await ProductService.checkAndResetExpiredProducts();
+      
+      // Load investment plans from service
+      const basicPlans = InvestmentPlanService.getBasicPlans().map(plan => ({
+        ...plan,
+        daily: plan.dailyIncome,
+        total: plan.totalReturn,
+        days: plan.cycleDays,
+        imageUrl: `/images/basic_${plan.id.split('-')[1]}.png.jpg`
+      }));
+      const specialPlans = InvestmentPlanService.getSpecialPlans().map(plan => ({
+        ...plan,
+        daily: plan.dailyIncome,
+        total: plan.totalReturn,
+        days: plan.cycleDays,
+        imageUrl: `/images/special_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
+      }));
+      
+      const premiumPlans = InvestmentPlanService.getPremiumPlans().map(plan => ({
+        ...plan,
+        daily: plan.dailyIncome,
+        total: plan.totalReturn,
+        days: plan.cycleDays,
+        imageUrl: `/images/premium_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
+      }));
+
+      setProducts({
+        basic: basicPlans,
+        special: specialPlans,
+        premium: premiumPlans
+      });
+
+      // Check if user can access special plans
+      if (user) {
+        const canAccess = await InvestmentPlanService.canAccessSpecialPlans(user.uid);
+        setCanAccessSpecialPlans(canAccess);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     console.log('useEffect triggered - user:', user?.uid, 'userData:', !!userData);
     
-    const loadProducts = async () => {
-      setIsLoadingProducts(true);
-      try {
-        console.log('Loading products...');
-        
-        // Check for expired products first
-        await ProductService.checkAndResetExpiredProducts();
-        
-        // Load investment plans from service
-        const basicPlans = InvestmentPlanService.getBasicPlans().map(plan => ({
-          ...plan,
-          daily: plan.dailyIncome,
-          total: plan.totalReturn,
-          days: plan.cycleDays,
-          imageUrl: `/images/basic_${plan.id.split('-')[1]}.png.jpg`
-        }));
-        const specialPlans = InvestmentPlanService.getSpecialPlans().map(plan => ({
-          ...plan,
-          daily: plan.dailyIncome,
-          total: plan.totalReturn,
-          days: plan.cycleDays,
-          imageUrl: `/images/special_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
-        }));
-        
-        const premiumPlans = InvestmentPlanService.getPremiumPlans().map(plan => ({
-          ...plan,
-          daily: plan.dailyIncome,
-          total: plan.totalReturn,
-          days: plan.cycleDays,
-          imageUrl: `/images/premium_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
-        }));
-
-        setProducts({
-          basic: basicPlans,
-          special: specialPlans,
-          premium: premiumPlans
-        });
-
-        // Check if user can access special plans
-        if (user) {
-          const canAccess = await InvestmentPlanService.canAccessSpecialPlans(user.uid);
-          setCanAccessSpecialPlans(canAccess);
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    };
-
     if (user) {
       loadProducts();
     }
-  }, [user, userData]);
+  }, [user, userData, loadProducts]);
 
   return (
     <div className="space-y-6">
@@ -786,7 +802,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.basic.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
                         ))
                     )}
                 </div>
@@ -804,7 +820,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.special.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
                         ))
                     )}
                 </div>
@@ -822,7 +838,7 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         products.premium.map(product => (
-                        <ProductCard key={product.id} product={product} onInvest={handleInvest} />
+                        <ProductCard key={product.id} product={product} onInvest={handleInvest} refreshAvailability={refreshAvailability} />
                         ))
                     )}
                 </div>
