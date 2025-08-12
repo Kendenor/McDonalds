@@ -7,7 +7,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { NotificationService, UserService } from '@/lib/user-service';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Briefcase, Users, User as UserIcon, Loader, Bell, ArrowLeft, Trash2, Trophy } from 'lucide-react';
+import { Home, Briefcase, Users, User as UserIcon, Loader, Bell, ArrowLeft, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -116,7 +116,6 @@ function Header() {
 
     const getTitle = () => {
         if (pathname.includes('/dashboard/my-products')) return 'My Products';
-        if (pathname.includes('/dashboard/tasks')) return 'Daily Tasks';
         if (pathname.includes('/dashboard/share')) return 'Share';
         if (pathname.includes('/dashboard/mine')) return 'Account';
         if (pathname.includes('/dashboard/announcements')) return 'Announcements';
@@ -133,7 +132,7 @@ function Header() {
     };
 
     const title = getTitle();
-    const showBackButton = pathname !== '/dashboard' && pathname !== '/dashboard/my-products' && pathname !== '/dashboard/tasks' && pathname !== '/dashboard/share' && pathname !== '/dashboard/mine';
+    const showBackButton = pathname !== '/dashboard' && pathname !== '/dashboard/my-products' && pathname !== '/dashboard/share' && pathname !== '/dashboard/mine';
 
     return (
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 flex items-center justify-between border-b">
@@ -171,12 +170,7 @@ function FooterNav() {
                 <span className="text-xs">Products</span>
             </Button>
         </Link>
-        <Link href="/dashboard/tasks">
-            <Button variant="ghost" className="flex flex-col h-auto p-1">
-                <Trophy />
-                <span className="text-xs">Tasks</span>
-            </Button>
-        </Link>
+
         <Link href="/dashboard/share">
              <Button variant="ghost" className="flex flex-col h-auto p-1">
                 <Users />

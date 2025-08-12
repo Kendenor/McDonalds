@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { ProductService, ClaimService, UserService } from '@/lib/user-service';
+import { ProductTaskService } from '@/lib/product-task-service';
 
 function PurchasedProductCard({
   product,
@@ -21,6 +22,10 @@ function PurchasedProductCard({
   onClaim: (productId: string, dailyEarning: number) => void;
   claimedToday: boolean;
 }) {
+  const [productTask, setProductTask] = useState<any>(null);
+  const [taskStatus, setTaskStatus] = useState<{ canComplete: boolean; message: string; timeRemaining?: number } | null>(null);
+  const [isLoadingTask, setIsLoadingTask] = useState(false);
+  const { toast } = useToast();
   const { name, imageUrl, dailyEarning, totalEarning, daysCompleted, totalDays, id, planType, isLocked, endDate } = product;
   const progress = (daysCompleted / totalDays) * 100;
   
@@ -55,6 +60,63 @@ function PurchasedProductCard({
     
     return () => clearInterval(interval);
   }, [isProductLocked, endDate]);
+
+  // Load product task and check status
+  useEffect(() => {
+    const loadProductTask = async () => {
+      try {
+        const userTasks = await ProductTaskService.getUserProductTasks(product.userId);
+        const task = userTasks.find(t => t.productId === product.productId);
+        setProductTask(task);
+        
+        if (task) {
+          const status = await ProductTaskService.canCompleteProductTask(task.id);
+          setTaskStatus(status);
+        }
+      } catch (error) {
+        console.error('Error loading product task:', error);
+      }
+    };
+
+    if (product.userId) {
+      loadProductTask();
+    }
+  }, [product.userId, product.productId]);
+
+  const handleCompleteTask = async () => {
+    if (!productTask) return;
+    
+    setIsLoadingTask(true);
+    try {
+      const result = await ProductTaskService.completeProductTask(productTask.id);
+      
+      if (result.success) {
+        toast({ 
+          title: "Task Completed!", 
+          description: result.message 
+        });
+        
+        // Refresh task status
+        const status = await ProductTaskService.canCompleteProductTask(productTask.id);
+        setTaskStatus(status);
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "Task Failed", 
+          description: result.message 
+        });
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: "Failed to complete task. Please try again." 
+      });
+    } finally {
+      setIsLoadingTask(false);
+    }
+  };
 
   return (
     <Card className="bg-card/50 overflow-hidden rounded-2xl w-full">
@@ -112,6 +174,54 @@ function PurchasedProductCard({
               >
                 {claimedToday ? <><CheckCircle className="mr-2"/> Claimed</> : "Claim Earnings"}
               </Button>
+            )}
+
+            {/* Product Daily Task Section */}
+            {productTask && (
+              <div className="space-y-2 mt-4 pt-4 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-primary">Daily Task</h4>
+                  {productTask.totalEarned > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      ₦{productTask.totalEarned.toLocaleString()} / ₦{productTask.totalExpected.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-xs text-blue-400 font-medium mb-1">
+                    {productTask.title}
+                  </p>
+                  <p className="text-xs text-blue-300 mb-2">
+                    {productTask.description}
+                  </p>
+                  
+                  {taskStatus && (
+                    <div className="space-y-2">
+                      {taskStatus.canComplete ? (
+                        <Button 
+                          className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-bold"
+                          onClick={handleCompleteTask}
+                          disabled={isLoadingTask}
+                        >
+                          {isLoadingTask ? 'Completing...' : `Complete Task (₦${productTask.reward})`}
+                        </Button>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-xs text-orange-400 font-medium">
+                            {taskStatus.message}
+                          </p>
+                          {taskStatus.timeRemaining && (
+                            <p className="text-xs text-orange-300">
+                              Available in {taskStatus.timeRemaining} hours
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
       </div>
     </Card>

@@ -19,8 +19,7 @@ import {
   Send,
   Star,
   CalendarCheck,
-  Lock,
-  Trophy
+  Lock
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -35,6 +34,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { UserService, TransactionService, ProductService, InvestmentPlanService } from '@/lib/user-service';
 import { ProductInventoryService } from '@/lib/product-inventory-service';
+import { ProductTaskService } from '@/lib/product-task-service';
 import { SettingsService } from '@/lib/firebase-service';
 
 function McDonaldLogo({ className }: { className?: string }) {
@@ -477,6 +477,15 @@ export default function DashboardPage() {
             }
         }
 
+        // Create product-specific daily task
+        await ProductTaskService.createProductTask(
+            user.uid,
+            product.id,
+            product.name,
+            product.cycleDays,
+            product.total
+        );
+
         // Update canAccessSpecialPlans if this is a basic plan
         if (planType === 'Basic') {
             setCanAccessSpecialPlans(true);
@@ -683,7 +692,7 @@ export default function DashboardPage() {
         />
       </div>
 
-               <div className="grid grid-cols-5 gap-4">
+               <div className="grid grid-cols-4 gap-4">
           <Link href="/dashboard/recharge" className="block">
              <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
               <div className="bg-primary text-primary-foreground p-3 rounded-xl">
@@ -708,14 +717,7 @@ export default function DashboardPage() {
               <p className="font-medium text-sm">Earnings</p>
             </Card>
           </Link>
-           <Link href="/dashboard/tasks" className="block">
-             <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
-              <div className="bg-primary text-primary-foreground p-3 rounded-xl">
-                <Trophy size={24} />
-              </div>
-              <p className="font-medium text-sm">Tasks</p>
-            </Card>
-          </Link>
+
            <Link href="/dashboard/share" className="block">
              <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
               <div className="bg-primary text-primary-foreground p-3 rounded-xl">
