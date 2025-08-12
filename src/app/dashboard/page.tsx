@@ -185,7 +185,7 @@ function ProductCard({
 }) {
   const [remainingDays, setRemainingDays] = useState<number>(0);
   const [isExpired, setIsExpired] = useState<boolean>(false);
-  const [availability, setAvailability] = useState<{ available: number; total: number }>({ available: 0, total: 0 });
+  const [availability, setAvailability] = useState<{ purchased: number; total: number }>({ purchased: 0, total: 0 });
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
 
   useEffect(() => {
@@ -222,7 +222,7 @@ function ProductCard({
         }
       } else {
         // Basic products are always available
-        setAvailability({ available: 999, total: 999 });
+        setAvailability({ purchased: 0, total: 999 });
         setIsLoadingAvailability(false);
       }
     };
@@ -230,7 +230,7 @@ function ProductCard({
     loadAvailability();
   }, [product.id, refreshKey]);
 
-  const isSoldOut = availability.available <= 0;
+  const isSoldOut = availability.purchased >= availability.total;
   const isProductLocked = (product.id.startsWith('basic') || product.id.startsWith('premium')) && isExpired;
 
   return (
@@ -299,7 +299,7 @@ function ProductCard({
                 <span className="text-xs text-muted-foreground">Loading...</span>
               ) : (
                 <span className={`font-semibold ${isSoldOut ? 'text-red-500' : 'text-green-500'}`}>
-                  {availability.available}/{availability.total}
+                  {availability.purchased}/{availability.total}
                 </span>
               )}
             </div>
@@ -478,7 +478,7 @@ export default function DashboardPage() {
                 return;
             }
             
-            const success = await ProductInventoryService.decreaseAvailability(product.id, productType);
+            const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
             
             if (success) {
                 console.log(`Successfully decreased availability for ${product.id}`);
