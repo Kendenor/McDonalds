@@ -28,11 +28,16 @@ export class ProductInventoryService {
       return;
     }
     try {
+      console.log('[DEBUG] Starting inventory initialization...');
+      
       // Check if inventory already exists
       const inventoryDoc = await getDoc(doc(db, this.COLLECTION, 'initialized'));
       if (inventoryDoc.exists()) {
+        console.log('[DEBUG] Inventory already initialized, skipping...');
         return; // Already initialized
       }
+
+      console.log('[DEBUG] Creating new inventory...');
 
       // Special products inventory - Track purchased count (starts at 0)
       const specialInventory = {
@@ -62,15 +67,45 @@ export class ProductInventoryService {
       };
 
       // Save inventory to Firestore
+      console.log('[DEBUG] Saving special inventory...');
       await setDoc(doc(db, this.COLLECTION, 'special'), specialInventory);
+      console.log('[DEBUG] Saving premium inventory...');
       await setDoc(doc(db, this.COLLECTION, 'premium'), premiumInventory);
+      console.log('[DEBUG] Saving initialization marker...');
       await setDoc(doc(db, this.COLLECTION, 'initialized'), {
         initialized: true,
         date: serverTimestamp()
       });
 
+      console.log('[DEBUG] Inventory initialization completed successfully');
+
     } catch (error) {
-      console.error('Error initializing inventory:', error);
+      console.error('[ERROR] Error initializing inventory:', error);
+      throw error; // Re-throw to let calling code handle it
+    }
+  }
+
+  // Force reset inventory (for debugging/admin use)
+  static async forceResetInventory(): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot reset inventory');
+      return;
+    }
+    try {
+      console.log('[DEBUG] Force resetting inventory...');
+      
+      // Delete the initialization marker
+      await setDoc(doc(db, this.COLLECTION, 'initialized'), {
+        initialized: false,
+        date: serverTimestamp()
+      });
+      
+      // Re-initialize
+      await this.initializeInventory();
+      console.log('[DEBUG] Inventory force reset completed');
+    } catch (error) {
+      console.error('[ERROR] Error force resetting inventory:', error);
+      throw error;
     }
   }
 
@@ -99,41 +134,56 @@ export class ProductInventoryService {
       return false;
     }
     try {
-      console.log(`Attempting to increase purchased count for ${productId} (${productType})`);
+      console.log(`[DEBUG] Attempting to increase purchased count for ${productId} (${productType})`);
       
       // First, ensure inventory is initialized
+      console.log(`[DEBUG] Initializing inventory...`);
       await this.initializeInventory();
+      console.log(`[DEBUG] Inventory initialization completed`);
       
       const inventoryDoc = await getDoc(doc(db, this.COLLECTION, productType));
+      console.log(`[DEBUG] Inventory document exists: ${inventoryDoc.exists()}`);
+      
       if (!inventoryDoc.exists()) {
-        console.error(`Inventory document for ${productType} does not exist after initialization`);
+        console.error(`[ERROR] Inventory document for ${productType} does not exist after initialization`);
         return false;
       }
 
       const inventory = inventoryDoc.data() as Record<string, { purchased: number; total: number; name: string }>;
-      console.log(`Current inventory for ${productType}:`, inventory);
+      console.log(`[DEBUG] Current inventory for ${productType}:`, inventory);
+      console.log(`[DEBUG] Looking for product: ${productId}`);
+      console.log(`[DEBUG] Available products:`, Object.keys(inventory));
       
       if (!inventory[productId]) {
-        console.error(`Product ${productId} not found in ${productType} inventory`);
+        console.error(`[ERROR] Product ${productId} not found in ${productType} inventory`);
+        console.error(`[ERROR] Available products:`, Object.keys(inventory));
         return false;
       }
       
+      console.log(`[DEBUG] Product ${productId} found. Current: ${inventory[productId].purchased}/${inventory[productId].total}`);
+      
       if (inventory[productId].purchased >= inventory[productId].total) {
-        console.error(`Product ${productId} is already sold out (purchased: ${inventory[productId].purchased}/${inventory[productId].total})`);
+        console.error(`[ERROR] Product ${productId} is already sold out (purchased: ${inventory[productId].purchased}/${inventory[productId].total})`);
         return false;
       }
 
       const oldPurchased = inventory[productId].purchased;
       inventory[productId].purchased += 1;
       
-      console.log(`Increasing ${productId} purchased count from ${oldPurchased} to ${inventory[productId].purchased}`);
+      console.log(`[DEBUG] Increasing ${productId} purchased count from ${oldPurchased} to ${inventory[productId].purchased}`);
       
       await setDoc(doc(db, this.COLLECTION, productType), inventory);
-      console.log(`Successfully updated inventory for ${productId}`);
+      console.log(`[DEBUG] Successfully updated inventory for ${productId}`);
       
       return true;
     } catch (error) {
-      console.error(`Error increasing purchased count for ${productId}:`, error);
+      console.error(`[ERROR] Error increasing purchased count for ${productId}:`, error);
+      console.error(`[ERROR] Error details:`, {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        productId,
+        productType
+      });
       return false;
     }
   }

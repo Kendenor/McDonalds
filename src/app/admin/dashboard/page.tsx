@@ -154,6 +154,26 @@ export default function AdminDashboardPage() {
         }
     };
 
+    const handleForceResetInventory = async () => {
+        setIsRestoring(true);
+        try {
+            await ProductInventoryService.forceResetInventory();
+            toast({
+                title: "Inventory Reset!",
+                description: "Product inventory has been forcefully reset to its initial state.",
+            });
+        } catch (error) {
+            console.error('Error force resetting inventory:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to force reset inventory. Please try again.",
+            });
+        } finally {
+            setIsRestoring(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-48">
@@ -175,30 +195,43 @@ export default function AdminDashboardPage() {
                     Restore Special and Premium products to full availability
                 </CardDescription>
             </CardHeader>
-            <CardContent className="flex gap-4">
+            <CardContent className="flex gap-4 flex-wrap">
                 <Button 
                     onClick={() => handleRestoreInventory('special')}
                     disabled={isRestoring}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700"
                 >
                     {isRestoring ? (
-                        <Loader className="h-4 w-4 animate-spin mr-2" />
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
+                        <RefreshCw className="mr-2 h-4 w-4" />
                     )}
                     Restore Special Products
                 </Button>
                 <Button 
                     onClick={() => handleRestoreInventory('premium')}
                     disabled={isRestoring}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-purple-600 hover:bg-purple-700"
                 >
                     {isRestoring ? (
-                        <Loader className="h-4 w-4 animate-spin mr-2" />
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
+                        <RefreshCw className="mr-2 h-4 w-4" />
                     )}
                     Restore Premium Products
+                </Button>
+                <Button 
+                    onClick={handleForceResetInventory}
+                    disabled={isRestoring}
+                    variant="outline"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                >
+                    {isRestoring ? (
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Force Reset Inventory (Debug)
                 </Button>
             </CardContent>
         </Card>

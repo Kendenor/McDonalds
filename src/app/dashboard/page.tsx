@@ -465,14 +465,15 @@ export default function DashboardPage() {
         // Decrease product availability for Special and Premium products
         if (product.id.startsWith('special') || product.id.startsWith('premium')) {
             const productType = product.id.startsWith('special') ? 'special' : 'premium';
-            console.log(`Before purchase - checking availability for ${product.id} (${productType})`);
+            console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
             
             // Ensure inventory is initialized first
             try {
+                console.log(`[DASHBOARD] Initializing inventory...`);
                 await ProductInventoryService.initializeInventory();
-                console.log(`Inventory initialized for ${productType}`);
+                console.log(`[DASHBOARD] Inventory initialized for ${productType}`);
             } catch (initError) {
-                console.error(`Failed to initialize inventory:`, initError);
+                console.error(`[DASHBOARD] Failed to initialize inventory:`, initError);
                 toast({ 
                     variant: "destructive", 
                     title: "System Error", 
@@ -482,7 +483,10 @@ export default function DashboardPage() {
             }
             
             // Check if product is still available before purchase
+            console.log(`[DASHBOARD] Checking if product is available...`);
             const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
+            console.log(`[DASHBOARD] Product available: ${isAvailable}`);
+            
             if (!isAvailable) {
                 toast({ 
                     variant: "destructive", 
@@ -492,20 +496,44 @@ export default function DashboardPage() {
                 return;
             }
             
+            console.log(`[DASHBOARD] Attempting to increase purchased count...`);
             const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
+            console.log(`[DASHBOARD] Increase purchased count result: ${success}`);
             
             if (success) {
-                console.log(`Successfully increased purchased count for ${product.id}`);
+                console.log(`[DASHBOARD] Successfully increased purchased count for ${product.id}`);
                 // Refresh the availability display
                 await refreshAvailability();
-                console.log(`After refresh - availability updated for ${product.id}`);
+                console.log(`[DASHBOARD] After refresh - availability updated for ${product.id}`);
             } else {
-                console.error(`Failed to increase purchased count for ${product.id}`);
-                toast({ 
-                    variant: "destructive", 
-                    title: "Error", 
-                    description: "Failed to update product availability. Please try again."
-                });
+                console.error(`[DASHBOARD] Failed to increase purchased count for ${product.id}`);
+                
+                // Get more specific error information
+                try {
+                    const availability = await ProductInventoryService.getProductAvailability(product.id, productType);
+                    console.log(`[DASHBOARD] Current availability:`, availability);
+                    
+                    if (availability.purchased >= availability.total) {
+                        toast({ 
+                            variant: "destructive", 
+                            title: "Product Sold Out", 
+                            description: "This product has reached its maximum capacity. Please try another product."
+                        });
+                    } else {
+                        toast({ 
+                            variant: "destructive", 
+                            title: "System Error", 
+                            description: "Failed to update product availability. Please try again or contact support."
+                        });
+                    }
+                } catch (error) {
+                    console.error(`[DASHBOARD] Error getting availability:`, error);
+                    toast({ 
+                        variant: "destructive", 
+                        title: "System Error", 
+                        description: "Failed to update product availability. Please try again."
+                    });
+                }
                 return;
             }
         }
