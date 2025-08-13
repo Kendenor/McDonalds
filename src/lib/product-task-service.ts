@@ -76,12 +76,25 @@ export class ProductTaskService {
 
     try {
       console.log(`[TASK] Saving task to Firestore with ID: ${taskId}`);
-      await setDoc(doc(db, this.collectionName, taskId), task);
+      
+      // Convert Date objects to Firestore timestamps for null values
+      const taskData = {
+        ...task,
+        lastCompletedAt: null,
+        nextAvailableTime: null,
+        lastActionTime: null
+      };
+      
+      await setDoc(doc(db, this.collectionName, taskId), taskData);
       console.log(`[TASK] Task saved successfully to Firestore`);
       
       // Verify the task was saved by reading it back
       const savedTask = await this.getProductTask(userId, productId);
       console.log(`[TASK] Verification - task read back:`, savedTask ? 'Success' : 'Failed');
+      
+      if (!savedTask) {
+        throw new Error('Task was not saved properly - verification failed');
+      }
       
       return task;
     } catch (error) {
@@ -102,6 +115,7 @@ export class ProductTaskService {
         const data = taskDoc.data();
         console.log(`[TASK] Task data retrieved:`, data);
         
+        // Handle date conversions properly
         const task = {
           ...data,
           lastCompletedAt: data.lastCompletedAt ? new Date(data.lastCompletedAt.toDate()) : null,

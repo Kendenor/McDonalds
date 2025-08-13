@@ -681,6 +681,14 @@ export default function DashboardPage() {
         console.log('[DASHBOARD] Creating product task...');
         const productTaskService = new ProductTaskService();
         try {
+            console.log('[DASHBOARD] Task creation parameters:', {
+                userId: user.uid,
+                productId: product.id,
+                productName: product.name,
+                totalReturn: product.total,
+                cycleDays: product.cycleDays
+            });
+            
             await productTaskService.createProductTask(
                 user.uid,
                 product.id,
@@ -698,6 +706,10 @@ export default function DashboardPage() {
             });
         } catch (taskError) {
             console.error('[DASHBOARD] Failed to create product task:', taskError);
+            console.error('[DASHBOARD] Task error details:', {
+                message: taskError instanceof Error ? taskError.message : 'Unknown error',
+                stack: taskError instanceof Error ? taskError.stack : 'No stack trace'
+            });
             // Don't fail the entire investment if task creation fails
             toast({ 
                 variant: "destructive", 
@@ -722,28 +734,10 @@ export default function DashboardPage() {
       setLastInvestedProduct(product.name);
       setShowInvestmentSuccess(true);
       
-      // Also show a more prominent success message
-      setTimeout(() => {
-          toast({ 
-              title: "Next Steps", 
-              description: `Go to "My Products" to view your investment and start completing daily tasks!`,
-              duration: 8000
-          });
-      }, 1000);
-      
       // Force refresh of products list
       console.log('[DASHBOARD] Investment completed, products should now be visible in My Products');
         
-      // Show a final notification after 3 seconds
-      setTimeout(() => {
-          toast({ 
-              title: "Product Ready!", 
-              description: `Your ${product.name} is now available in "My Products". Click the menu to access it!`,
-              duration: 10000
-          });
-      }, 3000);
-        
-        console.log('[DASHBOARD] Investment process completed successfully');
+      console.log('[DASHBOARD] Investment process completed successfully');
         
     } catch (error) {
         console.error('[DASHBOARD] Error processing investment:', error);
