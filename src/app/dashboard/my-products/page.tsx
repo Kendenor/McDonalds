@@ -11,7 +11,7 @@ import { UserService, ProductService } from '@/lib/user-service';
 import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, RefreshCw } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap } from 'lucide-react';
 
 interface PurchasedProduct {
   id: string;
@@ -91,7 +91,6 @@ export default function MyProductsPage() {
   const [productTasks, setProductTasks] = useState<Map<string, ProductTask>>(new Map());
   const [taskStatuses, setTaskStatuses] = useState<Map<string, TaskStatus>>(new Map());
   const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number }>>(new Map());
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -124,13 +123,6 @@ export default function MyProductsPage() {
       unsubscribe();
     };
   }, [user]);
-
-  // Refresh products when refreshKey changes
-  useEffect(() => {
-    if (user && refreshKey > 0) {
-      loadPurchasedProducts();
-    }
-  }, [refreshKey, user]);
 
   // Fallback: automatically stop loading after 15 seconds to prevent infinite loading
   useEffect(() => {
@@ -339,13 +331,6 @@ export default function MyProductsPage() {
     return "outline";
   };
 
-  // Function to manually refresh products
-  const handleRefresh = () => {
-    console.log('[PRODUCTS] Manual refresh triggered');
-    setRefreshKey(prev => prev + 1);
-    loadPurchasedProducts();
-  };
-
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -385,15 +370,6 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
-          <Button 
-            onClick={handleRefresh} 
-            variant="outline" 
-            size="sm"
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards

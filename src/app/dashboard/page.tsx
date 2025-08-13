@@ -689,13 +689,20 @@ export default function DashboardPage() {
                 product.cycleDays
             );
             console.log('[DASHBOARD] Product task created successfully');
+            
+            // Show immediate task availability notification
+            toast({ 
+                title: "Daily Tasks Ready!", 
+                description: `Your daily tasks for ${product.name} are now available. Complete 5 actions to earn ₦${Math.floor(product.total / product.cycleDays)} daily!`,
+                duration: 6000
+            });
         } catch (taskError) {
             console.error('[DASHBOARD] Failed to create product task:', taskError);
             // Don't fail the entire investment if task creation fails
             toast({ 
                 variant: "destructive", 
                 title: "Warning", 
-                description: "Investment successful but daily task creation failed. Please contact support."
+                description: "Investment successful but daily task creation failed. Please contact support." 
             });
         }
 
@@ -735,7 +742,7 @@ export default function DashboardPage() {
               duration: 10000
           });
       }, 3000);
-      
+        
         console.log('[DASHBOARD] Investment process completed successfully');
         
     } catch (error) {
@@ -955,26 +962,28 @@ export default function DashboardPage() {
        {/* Investment Success Banner */}
        {showInvestmentSuccess && (
          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700/40">
-           <CardContent className="p-4">
+           <CardContent className="p-6">
              <div className="flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                 <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-full">
-                   <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+               <div className="flex items-center gap-4">
+                 <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-full">
+                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
                  </div>
                  <div>
-                   <h3 className="font-semibold text-green-800 dark:text-green-200">
+                   <h3 className="font-bold text-lg text-green-800 dark:text-green-200">
                      Investment Successful! 🎉
                    </h3>
+                   <p className="text-sm text-green-600 dark:text-green-300 mb-2">
+                     You have successfully invested in <strong>{lastInvestedProduct}</strong>.
+                   </p>
                    <p className="text-sm text-green-600 dark:text-green-300">
-                     You have successfully invested in <strong>{lastInvestedProduct}</strong>. 
-                     Go to <strong>My Products</strong> to start completing daily tasks and earn rewards!
+                     <strong>Daily tasks are now available!</strong> Complete 5 actions daily to earn rewards.
                    </p>
                  </div>
                </div>
                <div className="flex gap-2">
                  <Link href="/dashboard/my-products">
-                   <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                     View My Products
+                   <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                     Start Daily Tasks
                    </Button>
                  </Link>
                  <Button 
