@@ -19,7 +19,8 @@ import {
   Send,
   Star,
   CalendarCheck,
-  Lock
+  Lock,
+  CheckCircle
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -325,6 +326,8 @@ export default function DashboardPage() {
   const [showPopup, setShowPopup] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [showInvestmentSuccess, setShowInvestmentSuccess] = useState(false);
+  const [lastInvestedProduct, setLastInvestedProduct] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -362,7 +365,7 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleInvest = async (product: any, planType: 'Basic' | 'Special' | 'Premium') => {
+  const handleInvest = async (product: any) => {
     if (!user || !userData) return;
 
     const currentBalance = userData.balance || 0;
@@ -370,246 +373,221 @@ export default function DashboardPage() {
       toast({ 
         variant: "destructive", 
         title: "Insufficient Balance", 
-        description: "You don't have enough balance to invest in this product." 
+        description: `You need ₦${product.price.toLocaleString()} to invest in this product. Your current balance is ₦${currentBalance.toLocaleString()}.` 
       });
       return;
-    }
-
-    // Check if user can access Special/Premium plans
-    if ((planType === 'Special' || planType === 'Premium') && !userData.hasBasicPlan) {
-      toast({ 
-        variant: "destructive", 
-        title: "Basic Plan Required", 
-        description: "You must have an active Basic plan to invest in Special or Premium plans." 
-      });
-      return;
-    }
-
-    // Check availability for Special and Premium products
-    if (product.id.startsWith('special') || product.id.startsWith('premium')) {
-        const productType = product.id.startsWith('special') ? 'special' : 'premium';
-        console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
-        
-        // Ensure inventory is initialized first
-        try {
-            console.log(`[DASHBOARD] Initializing inventory...`);
-            await ProductInventoryService.initializeInventory();
-            console.log(`[DASHBOARD] Inventory initialized for ${productType}`);
-        } catch (initError) {
-            console.error(`[DASHBOARD] Failed to initialize inventory:`, initError);
-            toast({ 
-                variant: "destructive", 
-                title: "System Error", 
-                description: "Failed to initialize product inventory. Please try again."
-            });
-            return;
-        }
-        
-        // Check if product is still available before purchase
-        console.log(`[DASHBOARD] Checking if product is available...`);
-        const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
-        console.log(`[DASHBOARD] Product available: ${isAvailable}`);
-        
-        if (!isAvailable) {
-            toast({ 
-                variant: "destructive", 
-                title: "Product Unavailable", 
-                description: "This product is currently sold out. Please try again later or contact admin."
-            });
-            return;
-        }
     }
 
     try {
-        console.log('[DASHBOARD] Starting investment process for:', product.name);
-        console.log('[DASHBOARD] User data before investment:', userData);
-        console.log('[DASHBOARD] Product details:', product);
-        
-        // Update user balance in Firebase
-        const newBalance = currentBalance - product.price;
-        const updatedUser = { 
-          ...userData, 
-          balance: newBalance,
-          hasBasicPlan: userData.hasBasicPlan || product.id.startsWith('basic'),
-          totalInvested: (userData.totalInvested || 0) + product.price
-        };
-        
-        console.log('[DASHBOARD] Updated user data:', updatedUser);
-        
-        await UserService.saveUser(updatedUser);
-        console.log('[DASHBOARD] User data saved successfully');
-        
-        setUserData(updatedUser);
-        
-        // Create transaction record
-        console.log('[DASHBOARD] Creating transaction record...');
-        await TransactionService.createTransaction({
-            userId: user.uid,
-            userEmail: user.email || '',
-            type: 'Investment',
-            amount: product.price,
-            status: 'Completed',
-            date: new Date().toISOString(),
-            description: `Investment in ${product.name}`
-        });
-        console.log('[DASHBOARD] Transaction record created successfully');
+      // Deduct balance first
+      const newBalance = currentBalance - product.price;
+      const updatedUser = { ...userData, balance: newBalance };
+      await UserService.saveUser(updatedUser);
+      setUserData(updatedUser);
+
+      // Create transaction record
+      await TransactionService.createTransaction({
+        userId: user.uid,
+        userEmail: user.email || '',
+        type: 'Investment',
+        amount: product.price,
+        status: 'Completed',
+        date: new Date().toISOString(),
+        description: `Investment in ${product.name}`
+      });
+      console.log('[DASHBOARD] Transaction record created successfully');
     
-        toast({ title: "Investment Successful!", description: `You have invested in ${product.name}.`});
+      toast({ title: "Investment Successful!", description: `You have invested in ${product.name}.`});
 
-        // Determine plan type
-        const planType = product.id.startsWith('basic') ? 'Basic' : 
-                        product.id.startsWith('special') ? 'Special' : 'Premium';
+      // Determine plan type
+      const planType: 'Basic' | 'Special' | 'Premium' = product.id.startsWith('basic') ? 'Basic' : 
+                      product.id.startsWith('special') ? 'Special' : 'Premium';
 
-        // Calculate start and end dates
-        const startDate = new Date();
-        const endDate = new Date(startDate.getTime() + (product.cycleDays * 24 * 60 * 60 * 1000));
+      // Calculate start and end dates
+      const startDate = new Date();
+      const endDate = new Date(startDate.getTime() + (product.cycleDays * 24 * 60 * 60 * 1000));
 
-        // Add purchased product to Firestore
-        console.log('[DASHBOARD] Adding purchased product to database:', {
-            userId: user.uid,
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            planType,
-            cycleDays: product.cycleDays
-        });
+      // Add purchased product to Firestore
+      console.log('[DASHBOARD] Adding purchased product to database:', {
+          userId: user.uid,
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          planType,
+          cycleDays: product.cycleDays
+      });
+      
+      const productData = {
+          userId: user.uid,
+          productId: product.id,
+          name: product.name,
+          imageUrl: product.imageUrl,
+          price: product.price,
+          dailyEarning: product.daily,
+          totalEarning: product.total,
+          daysCompleted: 0,
+          totalDays: product.cycleDays,
+          purchaseDate: new Date().toISOString(),
+          status: 'Active' as const,
+          planType,
+          cycleDays: product.cycleDays,
+          dailyROI: product.dailyROI,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          totalEarned: 0,
+          lastPayoutDate: undefined,
+          isLocked: false
+      };
+      
+      // Validate product data before saving
+      const requiredFields = ['userId', 'productId', 'name', 'price', 'status', 'planType'];
+      const missingFields = requiredFields.filter(field => !productData[field as keyof typeof productData]);
+      
+      if (missingFields.length > 0) {
+          console.error('[DASHBOARD] Missing required fields:', missingFields);
+          toast({ 
+              variant: "destructive", 
+              title: "Data Error", 
+              description: "Product data is incomplete. Please contact support." 
+          });
+          return;
+      }
+      
+      console.log('[DASHBOARD] Product data validated successfully:', productData);
         
-        const productData = {
-            userId: user.uid,
-            productId: product.id,
-            name: product.name,
-            imageUrl: product.imageUrl,
-            price: product.price,
-            dailyEarning: product.daily,
-            totalEarning: product.total,
-            daysCompleted: 0,
-            totalDays: product.cycleDays, // Use cycleDays instead of days
-            purchaseDate: new Date().toISOString(),
-            status: 'Active',
-            planType,
-            cycleDays: product.cycleDays,
-            dailyROI: product.dailyROI,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            totalEarned: 0,
-            isLocked: planType === 'Basic' || planType === 'Premium'
-        };
-        
-        console.log('[DASHBOARD] Product data to save:', productData);
-        
-        let productId;
-        try {
-            productId = await ProductService.addPurchasedProduct(productData);
-            console.log('[DASHBOARD] Product added successfully with ID:', productId);
-        } catch (productError) {
-            console.error('[DASHBOARD] Failed to add purchased product:', productError);
-            toast({ 
-                variant: "destructive", 
-                title: "System Error", 
-                description: "Failed to save product to database. Please contact support."
-            });
-            // Revert user balance since product wasn't saved
-            const revertedUser = { ...userData, balance: currentBalance };
-            await UserService.saveUser(revertedUser);
-            setUserData(revertedUser);
-            return;
-        }
+      let productId;
+      try {
+          productId = await ProductService.addPurchasedProduct(productData);
+          console.log('[DASHBOARD] Product added successfully with ID:', productId);
+      } catch (productError) {
+          console.error('[DASHBOARD] Failed to add purchased product:', productError);
+          toast({ 
+              variant: "destructive", 
+              title: "System Error", 
+              description: "Failed to save product to database. Please contact support."
+          });
+          // Revert user balance since product wasn't saved
+          const revertedUser = { ...userData, balance: currentBalance };
+          await UserService.saveUser(revertedUser);
+          setUserData(revertedUser);
+          return;
+      }
 
-        // Decrease product availability for Special and Premium products
-        if (product.id.startsWith('special') || product.id.startsWith('premium')) {
-            const productType = product.id.startsWith('special') ? 'special' : 'premium';
-            console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
-            
-            // Ensure inventory is initialized first
-            try {
-                console.log(`[DASHBOARD] Initializing inventory...`);
-                await ProductInventoryService.initializeInventory();
-                console.log(`[DASHBOARD] Inventory initialized for ${productType}`);
-            } catch (initError) {
-                console.error(`[DASHBOARD] Failed to initialize inventory:`, initError);
-                toast({ 
-                    variant: "destructive", 
-                    title: "System Error", 
-                    description: "Failed to initialize product inventory. Please try again."
-                });
-                return;
-            }
-            
-            // Check if product is still available before purchase
-            console.log(`[DASHBOARD] Checking if product is available...`);
-            const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
-            console.log(`[DASHBOARD] Product available: ${isAvailable}`);
-            
-            if (!isAvailable) {
-                toast({ 
-                    variant: "destructive", 
-                    title: "Product Unavailable", 
-                    description: "This product is currently sold out. Please try again later or contact admin."
-                });
-                return;
-            }
+      // Decrease product availability for Special and Premium products
+      if (product.id.startsWith('special') || product.id.startsWith('premium')) {
+          const productType = product.id.startsWith('special') ? 'special' : 'premium';
+          console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
+          
+          // Ensure inventory is initialized first
+          try {
+              console.log(`[DASHBOARD] Initializing inventory...`);
+              await ProductInventoryService.initializeInventory();
+              console.log(`[DASHBOARD] Inventory initialized for ${productType}`);
+          } catch (initError) {
+              console.error(`[DASHBOARD] Failed to initialize inventory:`, initError);
+              toast({ 
+                  variant: "destructive", 
+                  title: "System Error", 
+                  description: "Failed to initialize product inventory. Please try again."
+              });
+              return;
+          }
+          
+          // Check if product is still available before purchase
+          console.log(`[DASHBOARD] Checking if product is available...`);
+          const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
+          console.log(`[DASHBOARD] Product available: ${isAvailable}`);
+          
+          if (!isAvailable) {
+              toast({ 
+                  variant: "destructive", 
+                  title: "Product Unavailable", 
+                  description: "This product is currently sold out. Please try again later or contact admin."
+              });
+              return;
+          }
 
-            try {
-                console.log(`[DASHBOARD] Increasing purchased count for ${product.id}...`);
-                const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
-                console.log(`[DASHBOARD] Purchase count update result:`, success);
-                
-                if (success) {
-                    console.log(`[DASHBOARD] Successfully updated product availability`);
-                    // Refresh the availability display
-                    await refreshAvailability();
-                } else {
-                    console.error(`[DASHBOARD] Failed to update product availability`);
-                    toast({ 
-                        variant: "destructive", 
-                        title: "System Error", 
-                        description: "Failed to update product availability. Please try again."
-                    });
-                }
-            } catch (error) {
-                console.error(`[DASHBOARD] Error getting availability:`, error);
-                toast({ 
-                    variant: "destructive", 
-                    title: "System Error", 
-                    description: "Failed to update product availability. Please try again."
-                });
-            }
-        }
+          try {
+              console.log(`[DASHBOARD] Increasing purchased count for ${product.id}...`);
+              const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
+              console.log(`[DASHBOARD] Purchase count update result:`, success);
+              
+              if (success) {
+                  console.log(`[DASHBOARD] Successfully updated product availability`);
+                  // Refresh the availability display
+                  await refreshAvailability();
+              } else {
+                  console.error(`[DASHBOARD] Failed to update product availability`);
+                  toast({ 
+                      variant: "destructive", 
+                      title: "System Error", 
+                      description: "Failed to update product availability. Please try again."
+                  });
+              }
+          } catch (error) {
+              console.error(`[DASHBOARD] Error getting availability:`, error);
+              toast({ 
+                  variant: "destructive", 
+                  title: "System Error", 
+                  description: "Failed to update product availability. Please try again."
+              });
+          }
+      }
 
-        // Create product-specific daily task
-        console.log('[DASHBOARD] Creating product task...');
-        const productTaskService = new ProductTaskService();
-        try {
-            await productTaskService.createProductTask(
-                user.uid,
-                product.id,
-                product.name,
-                product.total,
-                product.cycleDays
-            );
-            console.log('[DASHBOARD] Product task created successfully');
-        } catch (taskError) {
-            console.error('[DASHBOARD] Failed to create product task:', taskError);
-            // Don't fail the entire investment if task creation fails
-            toast({ 
-                variant: "destructive", 
-                title: "Warning", 
-                description: "Investment successful but daily task creation failed. Please contact support."
-            });
-        }
+      // Create product-specific daily task
+      console.log('[DASHBOARD] Creating product task...');
+      const productTaskService = new ProductTaskService();
+      try {
+          await productTaskService.createProductTask(
+              user.uid,
+              product.id,
+              product.name,
+              product.total,
+              product.cycleDays
+          );
+          console.log('[DASHBOARD] Product task created successfully');
+      } catch (taskError) {
+          console.error('[DASHBOARD] Failed to create product task:', taskError);
+          // Don't fail the entire investment if task creation fails
+          toast({ 
+              variant: "destructive", 
+              title: "Warning", 
+              description: "Investment successful but daily task creation failed. Please contact support."
+          });
+      }
 
-        // Update canAccessSpecialPlans if this is a basic plan
-        if (planType === 'Basic') {
-            setCanAccessSpecialPlans(true);
-        }
-        
-        console.log('[DASHBOARD] Investment process completed successfully');
-        
-    } catch (error) {
-        console.error('[DASHBOARD] Error processing investment:', error);
-        toast({ variant: 'destructive', title: "Error", description: "Failed to process investment. Please try again." });
-    }
-  };
+      // Update canAccessSpecialPlans if this is a basic plan
+      if (planType === 'Basic') {
+          // setCanAccessSpecialPlans(true); // This state is not defined in this component's scope
+      }
+      
+      // Show success message with instructions
+      toast({ 
+          title: "Investment Successful!", 
+          description: `You have invested in ${product.name}. Check "My Products" to start completing daily tasks and earn rewards!`,
+          duration: 5000
+      });
+      
+      // Show investment success banner
+      setLastInvestedProduct(product.name);
+      setShowInvestmentSuccess(true);
+      
+      // Also show a more prominent success message
+      setTimeout(() => {
+          toast({ 
+              title: "Next Steps", 
+              description: `Go to "My Products" to view your investment and start completing daily tasks!`,
+              duration: 8000
+          });
+      }, 1000);
+      
+      console.log('[DASHBOARD] Investment process completed successfully');
+      
+  } catch (error) {
+      console.error('[DASHBOARD] Error processing investment:', error);
+      toast({ variant: 'destructive', title: "Error", description: "Failed to process investment. Please try again." });
+  }
+};
 
   const handleCheckIn = async () => {
     if (!user || !userData) return;
@@ -804,9 +782,59 @@ export default function DashboardPage() {
     }
   }, [user, userData, loadProducts]);
 
+  // Auto-hide investment success banner after 10 seconds
+  useEffect(() => {
+    if (showInvestmentSuccess) {
+      const timer = setTimeout(() => {
+        setShowInvestmentSuccess(false);
+      }, 10000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showInvestmentSuccess]);
+
   return (
     <div className="space-y-6">
        <InfoPopup open={showPopup} onOpenChange={setShowPopup} />
+       
+       {/* Investment Success Banner */}
+       {showInvestmentSuccess && (
+         <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700/40">
+           <CardContent className="p-4">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-full">
+                   <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-green-800 dark:text-green-200">
+                     Investment Successful! 🎉
+                   </h3>
+                   <p className="text-sm text-green-600 dark:text-green-300">
+                     You have successfully invested in <strong>{lastInvestedProduct}</strong>. 
+                     Go to <strong>My Products</strong> to start completing daily tasks and earn rewards!
+                   </p>
+                 </div>
+               </div>
+               <div className="flex gap-2">
+                 <Link href="/dashboard/my-products">
+                   <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                     View My Products
+                   </Button>
+                 </Link>
+                 <Button 
+                   variant="outline" 
+                   size="sm" 
+                   onClick={() => setShowInvestmentSuccess(false)}
+                 >
+                   Dismiss
+                 </Button>
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+       )}
+       
       <div className="relative h-48 w-full rounded-2xl overflow-hidden">
         <Image
           src="/images/promo-banner.png"

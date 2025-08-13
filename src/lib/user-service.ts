@@ -312,9 +312,23 @@ export class ProductService {
       const querySnapshot = await getDocs(q);
       console.log('[ProductService] Query result:', querySnapshot.docs.length, 'documents');
       
+      if (querySnapshot.docs.length === 0) {
+        console.log('[ProductService] No products found for user:', userId);
+        return [];
+      }
+      
       const products = querySnapshot.docs.map(doc => {
         const data = doc.data();
         console.log('[ProductService] Document data:', { id: doc.id, ...data });
+        
+        // Validate required fields
+        const requiredFields = ['userId', 'productId', 'name', 'price', 'status'];
+        const missingFields = requiredFields.filter(field => !data[field]);
+        
+        if (missingFields.length > 0) {
+          console.warn('[ProductService] Missing required fields:', missingFields, 'for document:', doc.id);
+        }
+        
         return { 
           id: doc.id, 
           ...data 
@@ -323,7 +337,21 @@ export class ProductService {
       
       console.log('[ProductService] Processed products:', products.length);
       console.log('[ProductService] Products:', products);
-      return products;
+      
+      // Filter out invalid products
+      const validProducts = products.filter(product => 
+        product.userId && 
+        product.productId && 
+        product.name && 
+        typeof product.price === 'number' && 
+        product.status
+      );
+      
+      if (validProducts.length !== products.length) {
+        console.warn('[ProductService] Filtered out', products.length - validProducts.length, 'invalid products');
+      }
+      
+      return validProducts;
     } catch (error) {
       console.error('[ProductService] Error getting user products:', error);
       return [];
