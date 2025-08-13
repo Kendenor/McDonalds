@@ -102,6 +102,19 @@ export default function MyProductsPage() {
     return () => unsubscribe();
   }, []);
 
+  // Fallback: automatically stop loading after 15 seconds to prevent infinite loading
+  useEffect(() => {
+    if (loading) {
+      const timeout = setTimeout(() => {
+        console.log('[PRODUCTS] Loading timeout reached, forcing loading to false');
+        setLoading(false);
+        setLoadingTasks(false);
+      }, 15000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [loading]);
+
   useEffect(() => {
     // Update countdowns every minute
     const interval = setInterval(updateCountdowns, 60000);
@@ -109,41 +122,48 @@ export default function MyProductsPage() {
   }, [productTasks]);
 
   const loadPurchasedProducts = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('[PRODUCTS] No user, skipping load');
+      return;
+    }
     
     try {
       setLoading(true);
-      console.log('[PRODUCTS] Loading products for user:', user.uid);
+      console.log('[PRODUCTS] Starting to load products for user:', user.uid);
       
-      // Add a timeout fallback to prevent infinite loading
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Loading timeout')), 10000)
-      );
+      // Load products with timeout protection
+      const products = await ProductService.getUserProducts(user.uid);
+      console.log('[PRODUCTS] Products loaded successfully:', products.length, 'products');
       
-      const products = await Promise.race([
-        ProductService.getUserProducts(user.uid),
-        timeoutPromise
-      ]) as PurchasedProduct[];
-      
-      console.log('[PRODUCTS] Loaded products:', products);
-      
+      // Set products immediately
       setPurchasedProducts(products);
       
-      // Load tasks for each product
-      if (products.length > 0) {
-        console.log('[PRODUCTS] Products found, loading tasks...');
-        setLoadingTasks(true);
-        await loadProductTasks(products);
-        setLoadingTasks(false);
-        setLoading(false); // Set loading to false after tasks are loaded
-        console.log('[PRODUCTS] Tasks loaded, loading complete');
-      } else {
-        console.log('[PRODUCTS] No products found, skipping task loading');
-        setLoading(false); // Set loading to false immediately if no products
-        console.log('[PRODUCTS] Loading set to false for no products');
+      // If no products, stop loading immediately
+      if (products.length === 0) {
+        console.log('[PRODUCTS] No products found, setting loading to false');
+        setLoading(false);
+        return;
       }
+      
+      // If products exist, load tasks in background
+      console.log('[PRODUCTS] Loading tasks for', products.length, 'products');
+      setLoadingTasks(true);
+      
+      try {
+        await loadProductTasks(products);
+        console.log('[PRODUCTS] Tasks loaded successfully');
+      } catch (taskError) {
+        console.error('[PRODUCTS] Error loading tasks:', taskError);
+      } finally {
+        setLoadingTasks(false);
+      }
+      
+      // Always set loading to false after products are loaded
+      setLoading(false);
+      console.log('[PRODUCTS] All loading completed');
+      
     } catch (error) {
-      console.error('[PRODUCTS] Failed to load purchased products:', error);
+      console.error('[PRODUCTS] Failed to load products:', error);
       setPurchasedProducts([]);
       setLoading(false);
     }
@@ -296,6 +316,8 @@ export default function MyProductsPage() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading your products...</p>
+            <p className="text-xs text-muted-foreground mt-2">This may take a few seconds</p>
+            <p className="text-xs text-muted-foreground">If this takes too long, please refresh the page</p>
           </div>
         </div>
       </div>

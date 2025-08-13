@@ -299,16 +299,21 @@ export class ProductService {
       return [];
     }
     try {
+      console.log('[ProductService] Getting products for user:', userId);
       const q = query(
         collection(db, this.COLLECTION), 
+        where('userId', '==', userId),
         orderBy('purchaseDate', 'desc')
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as PurchasedProduct))
-        .filter(product => product.userId === userId);
+      const products = querySnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      })) as PurchasedProduct[];
+      console.log('[ProductService] Found products:', products.length);
+      return products;
     } catch (error) {
-      console.error('Error getting user products:', error);
+      console.error('[ProductService] Error getting user products:', error);
       return [];
     }
   }
