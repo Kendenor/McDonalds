@@ -362,40 +362,53 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleInvest = async (product: any) => {
+  const handleInvest = async (product: any, planType: 'Basic' | 'Special' | 'Premium') => {
     if (!user || !userData) return;
 
     const currentBalance = userData.balance || 0;
-    
-    // Check if user has deposited (required for all plans)
-    if (!userData.hasDeposited) {
-        toast({ 
-            variant: "destructive", 
-            title: "Deposit Required", 
-            description: "You must make a deposit before investing in any plan."
-        });
-        return;
-    }
-
-    // Check access to Special/Premium plans
-    if ((product.id.startsWith('special') || product.id.startsWith('premium')) && !canAccessSpecialPlans) {
-        toast({ 
-            variant: "destructive", 
-            title: "Basic Plan Required", 
-            description: "You must purchase a Basic plan first to access Special and Premium plans."
-        });
-        return;
-    }
-    
     if (currentBalance < product.price) {
-        toast({ variant: "destructive", title: "Insufficient Funds", description: "You do not have enough balance to purchase this product."});
-        return;
+      toast({ 
+        variant: "destructive", 
+        title: "Insufficient Balance", 
+        description: "You don't have enough balance to invest in this product." 
+      });
+      return;
     }
 
-    // Check product availability for Special and Premium products
+    // Check if user can access Special/Premium plans
+    if ((planType === 'Special' || planType === 'Premium') && !userData.hasBasicPlan) {
+      toast({ 
+        variant: "destructive", 
+        title: "Basic Plan Required", 
+        description: "You must have an active Basic plan to invest in Special or Premium plans." 
+      });
+      return;
+    }
+
+    // Check availability for Special and Premium products
     if (product.id.startsWith('special') || product.id.startsWith('premium')) {
         const productType = product.id.startsWith('special') ? 'special' : 'premium';
+        console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
+        
+        // Ensure inventory is initialized first
+        try {
+            console.log(`[DASHBOARD] Initializing inventory...`);
+            await ProductInventoryService.initializeInventory();
+            console.log(`[DASHBOARD] Inventory initialized for ${productType}`);
+        } catch (initError) {
+            console.error(`[DASHBOARD] Failed to initialize inventory:`, initError);
+            toast({ 
+                variant: "destructive", 
+                title: "System Error", 
+                description: "Failed to initialize product inventory. Please try again."
+            });
+            return;
+        }
+        
+        // Check if product is still available before purchase
+        console.log(`[DASHBOARD] Checking if product is available...`);
         const isAvailable = await ProductInventoryService.isProductAvailable(product.id, productType);
+        console.log(`[DASHBOARD] Product available: ${isAvailable}`);
         
         if (!isAvailable) {
             toast({ 
@@ -408,6 +421,10 @@ export default function DashboardPage() {
     }
 
     try {
+        console.log('[DASHBOARD] Starting investment process for:', product.name);
+        console.log('[DASHBOARD] User data before investment:', userData);
+        console.log('[DASHBOARD] Product details:', product);
+        
         // Update user balance in Firebase
         const newBalance = currentBalance - product.price;
         const updatedUser = { 
@@ -416,10 +433,16 @@ export default function DashboardPage() {
           hasBasicPlan: userData.hasBasicPlan || product.id.startsWith('basic'),
           totalInvested: (userData.totalInvested || 0) + product.price
         };
+        
+        console.log('[DASHBOARD] Updated user data:', updatedUser);
+        
         await UserService.saveUser(updatedUser);
+        console.log('[DASHBOARD] User data saved successfully');
+        
         setUserData(updatedUser);
         
         // Create transaction record
+        console.log('[DASHBOARD] Creating transaction record...');
         await TransactionService.createTransaction({
             userId: user.uid,
             userEmail: user.email || '',
@@ -429,6 +452,7 @@ export default function DashboardPage() {
             date: new Date().toISOString(),
             description: `Investment in ${product.name}`
         });
+        console.log('[DASHBOARD] Transaction record created successfully');
     
         toast({ title: "Investment Successful!", description: `You have invested in ${product.name}.`});
 
@@ -450,7 +474,7 @@ export default function DashboardPage() {
             cycleDays: product.cycleDays
         });
         
-        const productId = await ProductService.addPurchasedProduct({
+        const productData = {
             userId: user.uid,
             productId: product.id,
             name: product.name,
@@ -469,9 +493,27 @@ export default function DashboardPage() {
             endDate: endDate.toISOString(),
             totalEarned: 0,
             isLocked: planType === 'Basic' || planType === 'Premium'
-        });
+        };
         
-        console.log('[DASHBOARD] Product added successfully with ID:', productId);
+        console.log('[DASHBOARD] Product data to save:', productData);
+        
+        let productId;
+        try {
+            productId = await ProductService.addPurchasedProduct(productData);
+            console.log('[DASHBOARD] Product added successfully with ID:', productId);
+        } catch (productError) {
+            console.error('[DASHBOARD] Failed to add purchased product:', productError);
+            toast({ 
+                variant: "destructive", 
+                title: "System Error", 
+                description: "Failed to save product to database. Please contact support."
+            });
+            // Revert user balance since product wasn't saved
+            const revertedUser = { ...userData, balance: currentBalance };
+            await UserService.saveUser(revertedUser);
+            setUserData(revertedUser);
+            return;
+        }
 
         // Decrease product availability for Special and Premium products
         if (product.id.startsWith('special') || product.id.startsWith('premium')) {
@@ -502,69 +544,69 @@ export default function DashboardPage() {
                 toast({ 
                     variant: "destructive", 
                     title: "Product Unavailable", 
-                    description: "This product is no longer available. Please try another product."
+                    description: "This product is currently sold out. Please try again later or contact admin."
                 });
                 return;
             }
-            
-            console.log(`[DASHBOARD] Attempting to increase purchased count...`);
-            const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
-            console.log(`[DASHBOARD] Increase purchased count result: ${success}`);
-            
-            if (success) {
-                console.log(`[DASHBOARD] Successfully increased purchased count for ${product.id}`);
-                // Refresh the availability display
-                await refreshAvailability();
-                console.log(`[DASHBOARD] After refresh - availability updated for ${product.id}`);
-            } else {
-                console.error(`[DASHBOARD] Failed to increase purchased count for ${product.id}`);
+
+            try {
+                console.log(`[DASHBOARD] Increasing purchased count for ${product.id}...`);
+                const success = await ProductInventoryService.increasePurchasedCount(product.id, productType);
+                console.log(`[DASHBOARD] Purchase count update result:`, success);
                 
-                // Get more specific error information
-                try {
-                    const availability = await ProductInventoryService.getProductAvailability(product.id, productType);
-                    console.log(`[DASHBOARD] Current availability:`, availability);
-                    
-                    if (availability.purchased >= availability.total) {
-                        toast({ 
-                            variant: "destructive", 
-                            title: "Product Sold Out", 
-                            description: "This product has reached its maximum capacity. Please try another product."
-                        });
-                    } else {
-                        toast({ 
-                            variant: "destructive", 
-                            title: "System Error", 
-                            description: "Failed to update product availability. Please try again or contact support."
-                        });
-                    }
-                } catch (error) {
-                    console.error(`[DASHBOARD] Error getting availability:`, error);
+                if (success) {
+                    console.log(`[DASHBOARD] Successfully updated product availability`);
+                    // Refresh the availability display
+                    await refreshAvailability();
+                } else {
+                    console.error(`[DASHBOARD] Failed to update product availability`);
                     toast({ 
                         variant: "destructive", 
                         title: "System Error", 
                         description: "Failed to update product availability. Please try again."
                     });
                 }
-                return;
+            } catch (error) {
+                console.error(`[DASHBOARD] Error getting availability:`, error);
+                toast({ 
+                    variant: "destructive", 
+                    title: "System Error", 
+                    description: "Failed to update product availability. Please try again."
+                });
             }
         }
 
         // Create product-specific daily task
+        console.log('[DASHBOARD] Creating product task...');
         const productTaskService = new ProductTaskService();
-        await productTaskService.createProductTask(
-            user.uid,
-            product.id,
-            product.name,
-            product.total,
-            product.cycleDays
-        );
+        try {
+            await productTaskService.createProductTask(
+                user.uid,
+                product.id,
+                product.name,
+                product.total,
+                product.cycleDays
+            );
+            console.log('[DASHBOARD] Product task created successfully');
+        } catch (taskError) {
+            console.error('[DASHBOARD] Failed to create product task:', taskError);
+            // Don't fail the entire investment if task creation fails
+            toast({ 
+                variant: "destructive", 
+                title: "Warning", 
+                description: "Investment successful but daily task creation failed. Please contact support."
+            });
+        }
 
         // Update canAccessSpecialPlans if this is a basic plan
         if (planType === 'Basic') {
             setCanAccessSpecialPlans(true);
         }
+        
+        console.log('[DASHBOARD] Investment process completed successfully');
+        
     } catch (error) {
-        console.error('Error processing investment:', error);
+        console.error('[DASHBOARD] Error processing investment:', error);
         toast({ variant: 'destructive', title: "Error", description: "Failed to process investment. Please try again." });
     }
   };
