@@ -424,8 +424,15 @@ export class ProductService {
       
       console.log('[ProductService] All validations passed, attempting to save...');
       
+      // Filter out undefined values to prevent Firestore errors
+      const cleanProductData = Object.fromEntries(
+        Object.entries(product).filter(([_, value]) => value !== undefined)
+      );
+      
+      console.log('[ProductService] Cleaned product data:', cleanProductData);
+      
       const docRef = await addDoc(collection(db, this.COLLECTION), {
-        ...product,
+        ...cleanProductData,
         createdAt: serverTimestamp()
       });
       

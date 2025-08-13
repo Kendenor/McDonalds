@@ -436,6 +436,14 @@ export default function DashboardPage() {
       const planType: 'Basic' | 'Special' | 'Premium' = product.id.startsWith('basic') ? 'Basic' : 
                       product.id.startsWith('special') ? 'Special' : 'Premium';
 
+      console.log('[DASHBOARD] Product type determined:', {
+          productId: product.id,
+          planType: planType,
+          isBasic: product.id.startsWith('basic'),
+          isSpecial: product.id.startsWith('special'),
+          isPremium: product.id.startsWith('premium')
+      });
+
       // Calculate start and end dates
       const startDate = new Date();
       const endDate = new Date(startDate.getTime() + (product.cycleDays * 24 * 60 * 60 * 1000));
@@ -468,7 +476,6 @@ export default function DashboardPage() {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
           totalEarned: 0,
-          lastPayoutDate: undefined,
           isLocked: false
       };
       
@@ -529,6 +536,28 @@ export default function DashboardPage() {
       
       console.log('[DASHBOARD] Product data validated successfully:', productData);
        
+       // Additional logging for debugging
+       console.log('[DASHBOARD] Final product data to be saved:', {
+           userId: productData.userId,
+           productId: productData.productId,
+           name: productData.name,
+           price: productData.price,
+           status: productData.status,
+           planType: productData.planType,
+           cycleDays: productData.cycleDays,
+           dailyROI: productData.dailyROI,
+           startDate: productData.startDate,
+           endDate: productData.endDate,
+           totalEarned: productData.totalEarned,
+           isLocked: productData.isLocked,
+           purchaseDate: productData.purchaseDate,
+           dailyEarning: productData.dailyEarning,
+           totalEarning: productData.totalEarning,
+           daysCompleted: productData.daysCompleted,
+           totalDays: productData.totalDays,
+           imageUrl: productData.imageUrl
+       });
+       
        // Test database connection before saving
        try {
            console.log('[DASHBOARD] Testing database connection...');
@@ -588,7 +617,7 @@ export default function DashboardPage() {
       // Decrease product availability for Special and Premium products
       if (product.id.startsWith('special') || product.id.startsWith('premium')) {
           const productType = product.id.startsWith('special') ? 'special' : 'premium';
-          console.log(`[DASHBOARD] Before purchase - checking availability for ${product.id} (${productType})`);
+          console.log(`[DASHBOARD] Processing ${productType} product availability for ${product.id}`);
           
           // Ensure inventory is initialized first
           try {
@@ -600,7 +629,7 @@ export default function DashboardPage() {
               toast({ 
                   variant: "destructive", 
                   title: "System Error", 
-                  description: "Failed to initialize product inventory. Please try again."
+                  description: "Failed to initialize product inventory. Please try again." 
               });
               return;
           }
@@ -614,7 +643,7 @@ export default function DashboardPage() {
               toast({ 
                   variant: "destructive", 
                   title: "Product Unavailable", 
-                  description: "This product is currently sold out. Please try again later or contact admin."
+                  description: "This product is currently sold out. Please try again later or contact admin." 
               });
               return;
           }
@@ -633,7 +662,7 @@ export default function DashboardPage() {
                   toast({ 
                       variant: "destructive", 
                       title: "System Error", 
-                      description: "Failed to update product availability. Please try again."
+                      description: "Failed to update product availability. Please try again." 
                   });
               }
           } catch (error) {
@@ -641,9 +670,11 @@ export default function DashboardPage() {
               toast({ 
                   variant: "destructive", 
                   title: "System Error", 
-                  description: "Failed to update product availability. Please try again."
+                  description: "Failed to update product availability. Please try again." 
               });
           }
+      } else {
+          console.log(`[DASHBOARD] Basic product ${product.id} - no inventory management required`);
       }
 
       // Create product-specific daily task
@@ -664,7 +695,7 @@ export default function DashboardPage() {
           toast({ 
               variant: "destructive", 
               title: "Warning", 
-              description: "Investment successful but daily task creation failed. Please contact support."
+              description: "Investment successful but daily task creation failed. Please contact support." 
           });
       }
 
@@ -692,6 +723,9 @@ export default function DashboardPage() {
               duration: 8000
           });
       }, 1000);
+      
+      // Force refresh of products list
+      console.log('[DASHBOARD] Investment completed, products should now be visible in My Products');
       
       console.log('[DASHBOARD] Investment process completed successfully');
       
