@@ -303,10 +303,10 @@ export class ProductService {
       console.log('[ProductService] Getting products for user:', userId);
       console.log('[ProductService] Collection:', this.COLLECTION);
       
+      // Simplified query without orderBy to avoid index requirements
       const q = query(
         collection(db, this.COLLECTION), 
-        where('userId', '==', userId),
-        orderBy('purchaseDate', 'desc')
+        where('userId', '==', userId)
       );
       
       console.log('[ProductService] Query created, executing...');
@@ -335,6 +335,9 @@ export class ProductService {
           ...data 
         } as PurchasedProduct;
       });
+      
+      // Sort products by purchase date in memory instead of in query
+      products.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
       
       console.log('[ProductService] Processed products:', products.length);
       console.log('[ProductService] Products:', products);
@@ -381,6 +384,48 @@ export class ProductService {
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
     }
+  }
+
+  // Listen to products changes for a specific user
+  static onProductsChange(userId: string, callback: (products: PurchasedProduct[]) => void) {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot listen to products changes');
+      return () => {};
+    }
+    
+    console.log('[ProductService] Setting up real-time listener for user:', userId);
+    
+    const q = query(
+      collection(db, this.COLLECTION), 
+      where('userId', '==', userId)
+    );
+    
+    return onSnapshot(q, (querySnapshot) => {
+      console.log('[ProductService] Real-time update received:', querySnapshot.docs.length, 'documents');
+      
+      const products = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          ...data 
+        } as PurchasedProduct;
+      });
+      
+      // Sort products by purchase date
+      products.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+      
+      // Filter out invalid products
+      const validProducts = products.filter(product => 
+        product.userId && 
+        product.productId && 
+        product.name && 
+        typeof product.price === 'number' && 
+        product.status
+      );
+      
+      console.log('[ProductService] Valid products for real-time update:', validProducts.length);
+      callback(validProducts);
+    });
   }
 
   // Add purchased product

@@ -103,6 +103,28 @@ export default function MyProductsPage() {
     return () => unsubscribe();
   }, []);
 
+  // Add real-time listener for products
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('[PRODUCTS] Setting up real-time listener for user:', user.uid);
+    
+    const unsubscribe = ProductService.onProductsChange(user.uid, (products) => {
+      console.log('[PRODUCTS] Real-time update received:', products.length, 'products');
+      setPurchasedProducts(products);
+      
+      // Load tasks for new products
+      if (products.length > 0) {
+        loadProductTasks(products);
+      }
+    });
+
+    return () => {
+      console.log('[PRODUCTS] Cleaning up real-time listener');
+      unsubscribe();
+    };
+  }, [user]);
+
   // Refresh products when refreshKey changes
   useEffect(() => {
     if (user && refreshKey > 0) {
@@ -319,7 +341,9 @@ export default function MyProductsPage() {
 
   // Function to manually refresh products
   const handleRefresh = () => {
+    console.log('[PRODUCTS] Manual refresh triggered');
     setRefreshKey(prev => prev + 1);
+    loadPurchasedProducts();
   };
 
   if (loading) {
