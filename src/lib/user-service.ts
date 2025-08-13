@@ -12,7 +12,8 @@ import {
   orderBy,
   where,
   serverTimestamp,
-  getDocs 
+  getDocs,
+  limit
 } from 'firebase/firestore';
 
 // Helper function to check if we're on client side
@@ -358,6 +359,30 @@ export class ProductService {
     }
   }
 
+  // Test database connection and permissions
+  static async testDatabaseConnection(): Promise<{ success: boolean; error?: string }> {
+    if (!isClientSide()) {
+      return { success: false, error: 'Not on client side' };
+    }
+    
+    try {
+      console.log('[ProductService] Testing database connection...');
+      
+      // Test if we can read from the collection
+      const testQuery = query(collection(db, this.COLLECTION), limit(1));
+      await getDocs(testQuery);
+      
+      console.log('[ProductService] Database connection test successful');
+      return { success: true };
+    } catch (error) {
+      console.error('[ProductService] Database connection test failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
   // Add purchased product
   static async addPurchasedProduct(product: Omit<PurchasedProduct, 'id'>): Promise<string> {
     if (!isClientSide()) {
@@ -367,6 +392,37 @@ export class ProductService {
     try {
       console.log('[ProductService] Adding purchased product:', product);
       console.log('[ProductService] Collection:', this.COLLECTION);
+      console.log('[ProductService] Firebase db object:', db);
+      console.log('[ProductService] Product data type check:', {
+        userId: typeof product.userId,
+        productId: typeof product.productId,
+        name: typeof product.name,
+        price: typeof product.price,
+        status: typeof product.status,
+        planType: typeof product.planType
+      });
+      
+      // Validate that all required fields are present and have correct types
+      if (!product.userId || typeof product.userId !== 'string') {
+        throw new Error(`Invalid userId: ${product.userId}`);
+      }
+      if (!product.productId || typeof product.productId !== 'string') {
+        throw new Error(`Invalid productId: ${product.productId}`);
+      }
+      if (!product.name || typeof product.name !== 'string') {
+        throw new Error(`Invalid name: ${product.name}`);
+      }
+      if (!product.price || typeof product.price !== 'number') {
+        throw new Error(`Invalid price: ${product.price}`);
+      }
+      if (!product.status || typeof product.status !== 'string') {
+        throw new Error(`Invalid status: ${product.status}`);
+      }
+      if (!product.planType || typeof product.planType !== 'string') {
+        throw new Error(`Invalid planType: ${product.planType}`);
+      }
+      
+      console.log('[ProductService] All validations passed, attempting to save...');
       
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...product,
@@ -377,6 +433,13 @@ export class ProductService {
       return docRef.id;
     } catch (error) {
       console.error('[ProductService] Error adding purchased product:', error);
+      console.error('[ProductService] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        product: product,
+        collection: this.COLLECTION,
+        firebaseInitialized: !!db
+      });
       throw error;
     }
   }

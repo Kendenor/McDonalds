@@ -368,6 +368,39 @@ export default function DashboardPage() {
   const handleInvest = async (product: any) => {
     if (!user || !userData) return;
 
+    // Check if Firebase is properly initialized
+    if (!db) {
+      console.error('[DASHBOARD] Firebase database not initialized');
+      toast({ 
+        variant: "destructive", 
+        title: "System Error", 
+        description: "Database connection not available. Please refresh the page and try again." 
+      });
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!auth.currentUser) {
+      console.error('[DASHBOARD] User not authenticated');
+      toast({ 
+        variant: "destructive", 
+        title: "Authentication Error", 
+        description: "You must be logged in to make investments. Please log in and try again." 
+      });
+      return;
+    }
+
+    // Verify user ID matches
+    if (auth.currentUser.uid !== user.uid) {
+      console.error('[DASHBOARD] User ID mismatch:', auth.currentUser.uid, 'vs', user.uid);
+      toast({ 
+        variant: "destructive", 
+        title: "Authentication Error", 
+        description: "User session mismatch. Please refresh the page and try again." 
+      });
+      return;
+    }
+
     const currentBalance = userData.balance || 0;
     if (currentBalance < product.price) {
       toast({ 
@@ -453,23 +486,102 @@ export default function DashboardPage() {
           return;
       }
       
+      // Additional validation for critical fields
+      if (!productData.userId || productData.userId.trim() === '') {
+          console.error('[DASHBOARD] Invalid userId:', productData.userId);
+          toast({ 
+              variant: "destructive", 
+              title: "Data Error", 
+              description: "Invalid user ID. Please refresh and try again." 
+          });
+          return;
+      }
+      
+      if (!productData.productId || productData.productId.trim() === '') {
+          console.error('[DASHBOARD] Invalid productId:', productData.productId);
+          toast({ 
+              variant: "destructive", 
+              title: "Data Error", 
+              description: "Invalid product ID. Please refresh and try again." 
+          });
+          return;
+      }
+      
+      if (!productData.name || productData.name.trim() === '') {
+          console.error('[DASHBOARD] Invalid name:', productData.name);
+          toast({ 
+              variant: "destructive", 
+              title: "Data Error", 
+              description: "Invalid product name. Please refresh and try again." 
+          });
+          return;
+      }
+      
+      if (typeof productData.price !== 'number' || productData.price <= 0) {
+          console.error('[DASHBOARD] Invalid price:', productData.price);
+          toast({ 
+              variant: "destructive", 
+              title: "Data Error", 
+              description: "Invalid product price. Please refresh and try again." 
+          });
+          return;
+      }
+      
       console.log('[DASHBOARD] Product data validated successfully:', productData);
-        
-      let productId;
+       
+       // Test database connection before saving
+       try {
+           console.log('[DASHBOARD] Testing database connection...');
+           const connectionTest = await ProductService.testDatabaseConnection();
+           
+           if (!connectionTest.success) {
+               console.error('[DASHBOARD] Database connection test failed:', connectionTest.error);
+               toast({ 
+                   variant: "destructive", 
+                   title: "Database Error", 
+                   description: `Database connection failed: ${connectionTest.error}. Please refresh and try again.` 
+               });
+               return;
+           }
+           
+           console.log('[DASHBOARD] Database connection test successful');
+       } catch (testError) {
+           console.error('[DASHBOARD] Database connection test error:', testError);
+           toast({ 
+               variant: "destructive", 
+               title: "Database Error", 
+               description: "Database connection test failed. Please refresh and try again." 
+           });
+           return;
+       }
+       
+       let productId;
       try {
+          console.log('[DASHBOARD] Attempting to save product to database...');
+          console.log('[DASHBOARD] Product data being saved:', JSON.stringify(productData, null, 2));
+          
           productId = await ProductService.addPurchasedProduct(productData);
           console.log('[DASHBOARD] Product added successfully with ID:', productId);
       } catch (productError) {
           console.error('[DASHBOARD] Failed to add purchased product:', productError);
-          toast({ 
-              variant: "destructive", 
-              title: "System Error", 
-              description: "Failed to save product to database. Please contact support."
+          console.error('[DASHBOARD] Error details:', {
+              message: productError instanceof Error ? productError.message : 'Unknown error',
+              stack: productError instanceof Error ? productError.stack : 'No stack trace',
+              productData: productData,
+              user: user?.uid,
+              balance: userData?.balance
           });
+          
           // Revert user balance since product wasn't saved
           const revertedUser = { ...userData, balance: currentBalance };
           await UserService.saveUser(revertedUser);
           setUserData(revertedUser);
+          
+          toast({ 
+              variant: "destructive", 
+              title: "Database Error", 
+              description: `Failed to save product: ${productError instanceof Error ? productError.message : 'Unknown error'}. Please contact support.`
+          });
           return;
       }
 
