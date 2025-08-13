@@ -300,17 +300,29 @@ export class ProductService {
     }
     try {
       console.log('[ProductService] Getting products for user:', userId);
+      console.log('[ProductService] Collection:', this.COLLECTION);
+      
       const q = query(
         collection(db, this.COLLECTION), 
         where('userId', '==', userId),
         orderBy('purchaseDate', 'desc')
       );
+      
+      console.log('[ProductService] Query created, executing...');
       const querySnapshot = await getDocs(q);
-      const products = querySnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      })) as PurchasedProduct[];
-      console.log('[ProductService] Found products:', products.length);
+      console.log('[ProductService] Query result:', querySnapshot.docs.length, 'documents');
+      
+      const products = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('[ProductService] Document data:', { id: doc.id, ...data });
+        return { 
+          id: doc.id, 
+          ...data 
+        } as PurchasedProduct;
+      });
+      
+      console.log('[ProductService] Processed products:', products.length);
+      console.log('[ProductService] Products:', products);
       return products;
     } catch (error) {
       console.error('[ProductService] Error getting user products:', error);
@@ -325,13 +337,18 @@ export class ProductService {
       throw new Error('Firebase not initialized');
     }
     try {
+      console.log('[ProductService] Adding purchased product:', product);
+      console.log('[ProductService] Collection:', this.COLLECTION);
+      
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...product,
         createdAt: serverTimestamp()
       });
+      
+      console.log('[ProductService] Product added successfully with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
-      console.error('Error adding purchased product:', error);
+      console.error('[ProductService] Error adding purchased product:', error);
       throw error;
     }
   }

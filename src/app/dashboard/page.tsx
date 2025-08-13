@@ -441,7 +441,16 @@ export default function DashboardPage() {
         const endDate = new Date(startDate.getTime() + (product.cycleDays * 24 * 60 * 60 * 1000));
 
         // Add purchased product to Firestore
-        await ProductService.addPurchasedProduct({
+        console.log('[DASHBOARD] Adding purchased product to database:', {
+            userId: user.uid,
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            planType,
+            cycleDays: product.cycleDays
+        });
+        
+        const productId = await ProductService.addPurchasedProduct({
             userId: user.uid,
             productId: product.id,
             name: product.name,
@@ -450,7 +459,7 @@ export default function DashboardPage() {
             dailyEarning: product.daily,
             totalEarning: product.total,
             daysCompleted: 0,
-            totalDays: product.days,
+            totalDays: product.cycleDays, // Use cycleDays instead of days
             purchaseDate: new Date().toISOString(),
             status: 'Active',
             planType,
@@ -461,6 +470,8 @@ export default function DashboardPage() {
             totalEarned: 0,
             isLocked: planType === 'Basic' || planType === 'Premium'
         });
+        
+        console.log('[DASHBOARD] Product added successfully with ID:', productId);
 
         // Decrease product availability for Special and Premium products
         if (product.id.startsWith('special') || product.id.startsWith('premium')) {
