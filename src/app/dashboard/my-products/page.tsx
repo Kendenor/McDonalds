@@ -11,7 +11,7 @@ import { UserService, ProductService } from '@/lib/user-service';
 import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
 
 interface PurchasedProduct {
   id: string;
@@ -324,6 +324,12 @@ export default function MyProductsPage() {
     return task.completedActions > actionIndex;
   };
 
+  const isCycleEnded = (product: PurchasedProduct): boolean => {
+    const now = new Date();
+    const endDate = new Date(product.endDate);
+    return now >= endDate;
+  };
+
   const getActionButtonVariant = (productId: string, actionType: string): "default" | "secondary" | "outline" => {
     if (isActionCompleted(productId, actionType)) {
       return "secondary";
@@ -439,7 +445,8 @@ export default function MyProductsPage() {
                           )}
                         </div>
                         
-                        {task ? (
+                        {/* Special Plans: Always show tasks with 24-hour countdown */}
+                        {product.planType === 'Special' && task ? (
                           <>
                             {/* Task Progress */}
                             <div className="space-y-3">
@@ -509,8 +516,108 @@ export default function MyProductsPage() {
                               </div>
                             </div>
                           </>
+                        ) : product.planType === 'Special' && !task ? (
+                          // Special plan but no task created yet
+                          <div className="text-center p-4 border rounded-lg">
+                            <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Task system initializing...</p>
+                          </div>
+                        ) : (product.planType === 'Basic' || product.planType === 'Premium') ? (
+                          // Basic and Premium plans: Show tasks when cycle ends
+                          isCycleEnded(product) && task ? (
+                            <>
+                              {/* Task Progress */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span>Task Progress</span>
+                                  <span>{task.completedActions}/{task.requiredActions} Actions</span>
+                                </div>
+                                <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="grid grid-cols-2 gap-2">
+                                {task.actionTypes.map((actionType, index) => {
+                                  const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
+                                  const isCompleted = isActionCompleted(product.id, actionType);
+                                  
+                                  return (
+                                    <Button
+                                      key={actionType}
+                                      variant={getActionButtonVariant(product.id, actionType)}
+                                      size="sm"
+                                      onClick={() => handleCompleteAction(product.id, actionType)}
+                                      disabled={isCompleted}
+                                      className="h-10 text-xs"
+                                    >
+                                      {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
+                                      {getActionButtonText(product.id, actionType)}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Task Completion */}
+                              <div className="pt-3 border-t">
+                                {status?.canComplete ? (
+                                  <Button 
+                                    onClick={() => handleCompleteTask(product.id)}
+                                    className="w-full"
+                                    size="sm"
+                                  >
+                                    <Trophy className="h-4 w-4 mr-2" />
+                                    Complete Daily Task (₦{task.dailyReward.toLocaleString()})
+                                  </Button>
+                                ) : (
+                                  <div className="text-center">
+                                    {countdown ? (
+                                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <Clock className="h-4 w-4" />
+                                        <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Task Stats */}
+                              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                                <div className="text-center">
+                                  <p className="text-xs text-muted-foreground">Earned Today</p>
+                                  <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-muted-foreground">Expected Total</p>
+                                  <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            // Cycle not ended yet - show locked message
+                            <div className="text-center p-4 border rounded-lg">
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                <Lock className="h-6 w-6 text-muted-foreground" />
+                                <span className="font-medium">Tasks Locked</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-3">
+                                Tasks will be available when your {product.planType} plan cycle ends
+                              </p>
+                              <div className="text-xs text-muted-foreground">
+                                <p>Cycle Progress: {product.daysCompleted}/{product.totalDays} days</p>
+                                <p>End Date: {new Date(product.endDate).toLocaleDateString()}</p>
+                                {!isCycleEnded(product) && (
+                                  <p className="mt-2 text-orange-500">
+                                    ⏰ Cycle ends in {Math.ceil((new Date(product.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )
                         ) : (
-                          <div className="text-center py-8">
+                          // Fallback for unknown plan types
+                          <div className="text-center p-4 border rounded-lg">
                             <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                             <p className="text-sm text-muted-foreground">No task available for this product</p>
                           </div>
