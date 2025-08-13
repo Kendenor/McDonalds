@@ -677,56 +677,59 @@ export default function DashboardPage() {
 
     // Load products and check access
   const loadProducts = useCallback(async () => {
-    setIsLoadingProducts(true);
-    try {
-      console.log('Loading products...');
+      setIsLoadingProducts(true);
+      try {
+        console.log('Loading products...');
       
       // Initialize inventory if not already done
       await ProductInventoryService.initializeInventory();
-      
-      // Check for expired products first
-      await ProductService.checkAndResetExpiredProducts();
-      
-      // Load investment plans from service
-      const basicPlans = InvestmentPlanService.getBasicPlans().map(plan => ({
-        ...plan,
-        daily: plan.dailyIncome,
-        total: plan.totalReturn,
-        days: plan.cycleDays,
-        imageUrl: `/images/basic_${plan.id.split('-')[1]}.png.jpg`
-      }));
-      const specialPlans = InvestmentPlanService.getSpecialPlans().map(plan => ({
-        ...plan,
-        daily: plan.dailyIncome,
-        total: plan.totalReturn,
-        days: plan.cycleDays,
-        imageUrl: `/images/special_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
-      }));
-      
-      const premiumPlans = InvestmentPlanService.getPremiumPlans().map(plan => ({
-        ...plan,
-        daily: plan.dailyIncome,
-        total: plan.totalReturn,
-        days: plan.cycleDays,
-        imageUrl: `/images/premium_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
-      }));
+        
+        // Check for expired products first
+        await ProductService.checkAndResetExpiredProducts();
+        
+        // Check for expired tasks
+        await ProductTaskService.checkAndExpireTasks();
+        
+        // Load investment plans from service
+        const basicPlans = InvestmentPlanService.getBasicPlans().map(plan => ({
+          ...plan,
+          daily: plan.dailyIncome,
+          total: plan.totalReturn,
+          days: plan.cycleDays,
+          imageUrl: `/images/basic_${plan.id.split('-')[1]}.png.jpg`
+        }));
+        const specialPlans = InvestmentPlanService.getSpecialPlans().map(plan => ({
+          ...plan,
+          daily: plan.dailyIncome,
+          total: plan.totalReturn,
+          days: plan.cycleDays,
+          imageUrl: `/images/special_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
+        }));
+        
+        const premiumPlans = InvestmentPlanService.getPremiumPlans().map(plan => ({
+          ...plan,
+          daily: plan.dailyIncome,
+          total: plan.totalReturn,
+          days: plan.cycleDays,
+          imageUrl: `/images/premium_${plan.id.split('-')[1]}.jpg.jpg?t=${Date.now()}`
+        }));
 
-      setProducts({
-        basic: basicPlans,
-        special: specialPlans,
-        premium: premiumPlans
-      });
+        setProducts({
+          basic: basicPlans,
+          special: specialPlans,
+          premium: premiumPlans
+        });
 
-      // Check if user can access special plans
-      if (user) {
-        const canAccess = await InvestmentPlanService.canAccessSpecialPlans(user.uid);
-        setCanAccessSpecialPlans(canAccess);
+        // Check if user can access special plans
+        if (user) {
+          const canAccess = await InvestmentPlanService.canAccessSpecialPlans(user.uid);
+          setCanAccessSpecialPlans(canAccess);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setIsLoadingProducts(false);
       }
-    } catch (error) {
-      console.error('Error loading products:', error);
-    } finally {
-      setIsLoadingProducts(false);
-    }
   }, [user]);
 
   // Function to refresh product availability
@@ -740,7 +743,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     console.log('useEffect triggered - user:', user?.uid, 'userData:', !!userData);
-    
+
     if (user) {
       loadProducts();
     }
@@ -759,7 +762,7 @@ export default function DashboardPage() {
         />
       </div>
 
-               <div className="grid grid-cols-4 gap-4">
+       <div className="grid grid-cols-4 gap-4">
           <Link href="/dashboard/recharge" className="block">
              <Card className="bg-card/50 hover:bg-card/90 transition-colors text-card-foreground p-4 flex flex-col items-center justify-center gap-2 rounded-2xl aspect-square">
               <div className="bg-primary text-primary-foreground p-3 rounded-xl">

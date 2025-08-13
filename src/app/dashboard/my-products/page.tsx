@@ -2,7 +2,7 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, Package, CheckCircle } from 'lucide-react';
+import { DollarSign, Package, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Progress } from "@/components/ui/progress"
@@ -23,8 +23,16 @@ function PurchasedProductCard({
   claimedToday: boolean;
 }) {
   const [productTask, setProductTask] = useState<any>(null);
-  const [taskStatus, setTaskStatus] = useState<{ canComplete: boolean; message: string; timeRemaining?: number } | null>(null);
+  const [taskStatus, setTaskStatus] = useState<{ 
+    canComplete: boolean; 
+    message: string; 
+    timeRemaining?: number;
+    hoursRemaining?: number;
+    minutesRemaining?: number;
+    nextAvailableTime?: Date;
+  } | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
+  const [countdown, setCountdown] = useState<string>('');
   const { toast } = useToast();
   const { name, imageUrl, dailyEarning, totalEarning, daysCompleted, totalDays, id, planType, isLocked, endDate } = product;
   const progress = (daysCompleted / totalDays) * 100;
@@ -83,6 +91,42 @@ function PurchasedProductCard({
     }
   }, [product.userId, product.productId]);
 
+  // Update countdown timer for task cooldown
+  useEffect(() => {
+    if (!taskStatus || taskStatus.canComplete) {
+      setCountdown('');
+      return;
+    }
+
+    const updateCountdown = () => {
+      if (!taskStatus.nextAvailableTime) return;
+      
+      const now = new Date();
+      const nextAvailable = new Date(taskStatus.nextAvailableTime);
+      const diff = nextAvailable.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setCountdown('');
+        // Refresh task status
+        if (productTask) {
+          ProductTaskService.canCompleteProductTask(productTask.id).then(setTaskStatus);
+        }
+        return;
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000); // Update every second
+    
+    return () => clearInterval(interval);
+  }, [taskStatus, productTask]);
+
   const handleCompleteTask = async () => {
     if (!productTask) return;
     
@@ -99,6 +143,12 @@ function PurchasedProductCard({
         // Refresh task status
         const status = await ProductTaskService.canCompleteProductTask(productTask.id);
         setTaskStatus(status);
+        
+        // Refresh product task data
+        const updatedTask = await ProductTaskService.getProductTask(productTask.id);
+        if (updatedTask) {
+          setProductTask(updatedTask);
+        }
       } else {
         toast({ 
           variant: "destructive", 
@@ -117,6 +167,10 @@ function PurchasedProductCard({
       setIsLoadingTask(false);
     }
   };
+
+  // Check if task is expired
+  const isTaskExpired = productTask?.isExpired || false;
+  const isCycleComplete = productTask?.cycleDaysCompleted >= productTask?.cycleDays;
 
   return (
     <Card className="bg-card/50 overflow-hidden rounded-2xl w-full">
@@ -180,7 +234,10 @@ function PurchasedProductCard({
             {productTask && (
               <div className="space-y-2 mt-4 pt-4 border-t border-border/50">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-primary">Daily Task</h4>
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Clock size={14} />
+                    Daily Task
+                  </h4>
                   {productTask.totalEarned > 0 && (
                     <span className="text-xs text-muted-foreground">
                       ₦{productTask.totalEarned.toLocaleString()} / ₦{productTask.totalExpected.toLocaleString()}
@@ -188,15 +245,46 @@ function PurchasedProductCard({
                   )}
                 </div>
                 
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                  <p className="text-xs text-blue-400 font-medium mb-1">
-                    {productTask.title}
+                <div className={`border rounded-lg p-3 ${
+                  isTaskExpired || isCycleComplete 
+                    ? 'bg-red-500/10 border-red-500/20' 
+                    : 'bg-blue-500/10 border-blue-500/20'
+                }`}>
+                  <p className="text-xs font-medium mb-1 flex items-center gap-2">
+                    {isTaskExpired || isCycleComplete ? (
+                      <>
+                        <AlertCircle size={12} className="text-red-400" />
+                        <span className="text-red-400">
+                          {isCycleComplete ? 'Cycle Completed' : 'Product Expired'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={12} className="text-blue-400" />
+                        <span className="text-blue-400">{productTask.title}</span>
+                      </>
+                    )}
                   </p>
-                  <p className="text-xs text-blue-300 mb-2">
+                  
+                  <p className="text-xs mb-2 text-muted-foreground">
                     {productTask.description}
                   </p>
                   
-                  {taskStatus && (
+                  {/* Task Progress */}
+                  <div className="space-y-2 mb-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Task Progress</span>
+                      <span className="font-medium">
+                        {productTask.cycleDaysCompleted} / {productTask.cycleDays} days
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(productTask.cycleDaysCompleted / productTask.cycleDays) * 100} 
+                      className="h-2" 
+                    />
+                  </div>
+                  
+                  {taskStatus && !isTaskExpired && !isCycleComplete && (
                     <div className="space-y-2">
                       {taskStatus.canComplete ? (
                         <Button 
@@ -204,20 +292,34 @@ function PurchasedProductCard({
                           onClick={handleCompleteTask}
                           disabled={isLoadingTask}
                         >
-                          {isLoadingTask ? 'Completing...' : `Complete Task (₦${productTask.reward})`}
+                          {isLoadingTask ? 'Completing...' : `Complete Task (₦${productTask.reward.toLocaleString()})`}
                         </Button>
                       ) : (
-                        <div className="text-center">
+                        <div className="text-center space-y-2">
                           <p className="text-xs text-orange-400 font-medium">
                             {taskStatus.message}
                           </p>
-                          {taskStatus.timeRemaining && (
-                            <p className="text-xs text-orange-300">
-                              Available in {taskStatus.timeRemaining} hours
-                            </p>
+                          {countdown && (
+                            <div className="bg-orange-500/20 rounded-lg p-2">
+                              <p className="text-xs text-orange-300 font-mono">
+                                Next available in: {countdown}
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+                  
+                  {/* Expired/Completed Status */}
+                  {(isTaskExpired || isCycleComplete) && (
+                    <div className="text-center">
+                      <p className="text-xs text-red-400 font-medium">
+                        {isCycleComplete 
+                          ? 'All tasks completed for this product cycle!' 
+                          : 'This product has expired. No more tasks available.'
+                        }
+                      </p>
                     </div>
                   )}
                 </div>

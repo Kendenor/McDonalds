@@ -7,11 +7,12 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { NotificationService, UserService } from '@/lib/user-service';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Briefcase, Users, User as UserIcon, Loader, Bell, ArrowLeft, Trash2 } from 'lucide-react';
+import { Home, Briefcase, Users, User as UserIcon, Loader, Bell, ArrowLeft, Trash2, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
+import { Chatbot } from '@/components/ui/chatbot';
 
 interface Notification {
     id: string;
@@ -248,6 +249,7 @@ export default function DashboardLayout({
         {children}
        </main>
       <FooterNav />
+      <Chatbot />
     </div>
   );
 }

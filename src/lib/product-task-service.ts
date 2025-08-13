@@ -37,6 +37,8 @@ export interface ProductTask {
   totalExpected: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  isExpired: boolean;
+  nextAvailableTime?: Timestamp;
 }
 
 // Product Task Service
@@ -56,6 +58,8 @@ export class ProductTaskService {
       return;
     }
     try {
+      // Calculate daily reward: Total Return / Cycle Days
+      // This ensures users earn the full total return over the cycle period
       const dailyReward = Math.floor(totalExpected / cycleDays);
       
       const productTask = {
@@ -64,7 +68,7 @@ export class ProductTaskService {
         productName,
         taskType: 'product_daily_task',
         title: `Daily Task - ${productName}`,
-        description: `Complete daily task for ${productName}. Earn ₦${dailyReward} per completion.`,
+        description: `Complete daily task for ${productName}. Earn ₦${dailyReward.toLocaleString()} per completion. Complete ${cycleDays} times to earn ₦${totalExpected.toLocaleString()}.`,
         reward: dailyReward,
         maxCompletions: 1, // One completion per day
         completionsToday: 0,
@@ -75,11 +79,13 @@ export class ProductTaskService {
         totalEarned: 0,
         totalExpected,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        isExpired: false,
+        nextAvailableTime: null
       };
 
       await addDoc(collection(db, this.COLLECTION), productTask);
-      console.log(`Created product task for ${productName} with daily reward: ₦${dailyReward}`);
+      console.log(`[ProductTask] Created product task for ${productName} with daily reward: ₦${dailyReward.toLocaleString()}`);
     } catch (error) {
       console.error('Error creating product task:', error);
     }
@@ -128,7 +134,7 @@ export class ProductTaskService {
   }
 
   // Complete a product daily task
-  static async completeProductTask(taskId: string): Promise<{ success: boolean; message: string; reward?: number }> {
+  static async completeProductTask(taskId: string): Promise<{ success: boolean; message: string; reward?: number; nextAvailableTime?: Date }> {
     if (!isClientSide()) {
       console.warn('Firebase not initialized on server, cannot complete product task');
       return { success: false, message: 'Server-side execution not allowed' };
@@ -142,6 +148,11 @@ export class ProductTaskService {
       // Check if product cycle is complete
       if (task.cycleDaysCompleted >= task.cycleDays) {
         return { success: false, message: 'Product cycle completed. No more tasks available.' };
+      }
+
+      // Check if task is expired
+      if (task.isExpired) {
+        return { success: false, message: 'Product has expired. No more tasks available.' };
       }
 
       // Check if already completed today
@@ -170,13 +181,23 @@ export class ProductTaskService {
       const newCompletionsToday = lastCompletedDate === today ? task.completionsToday + 1 : 1;
       const newTotalEarned = task.totalEarned + task.reward;
       const newCycleDaysCompleted = Math.floor(newTotalEarned / task.reward);
+      
+      // Calculate next available time (24 hours from now)
+      const now = new Date();
+      const nextAvailableTime = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+
+      // Check if this completes the cycle
+      const isCycleComplete = newCycleDaysCompleted >= task.cycleDays;
+      const isExpired = isCycleComplete;
 
       await updateDoc(taskDoc, {
         completionsToday: newCompletionsToday,
         lastCompletedAt: serverTimestamp(),
         totalEarned: newTotalEarned,
         cycleDaysCompleted: newCycleDaysCompleted,
-        completed: newCycleDaysCompleted >= task.cycleDays,
+        completed: isCycleComplete,
+        isExpired: isExpired,
+        nextAvailableTime: serverTimestamp(nextAvailableTime),
         updatedAt: serverTimestamp()
       });
 
@@ -184,10 +205,13 @@ export class ProductTaskService {
       const { UserService } = await import('./user-service');
       await UserService.addToBalance(task.userId, task.reward, 'Product_Task_Reward');
 
+      console.log(`[ProductTask] Task completed for ${task.productName}. Earned: ₦${task.reward.toLocaleString()}, Total: ₦${newTotalEarned.toLocaleString()}/${task.totalExpected.toLocaleString()}`);
+
       return { 
         success: true, 
-        message: `Task completed! Earned ₦${task.reward}`,
-        reward: task.reward
+        message: `Task completed! Earned ₦${task.reward.toLocaleString()}`,
+        reward: task.reward,
+        nextAvailableTime: nextAvailableTime
       };
     } catch (error) {
       console.error('Error completing product task:', error);
@@ -196,7 +220,14 @@ export class ProductTaskService {
   }
 
   // Check if user can complete a product task
-  static async canCompleteProductTask(taskId: string): Promise<{ canComplete: boolean; message: string; timeRemaining?: number }> {
+  static async canCompleteProductTask(taskId: string): Promise<{ 
+    canComplete: boolean; 
+    message: string; 
+    timeRemaining?: number;
+    hoursRemaining?: number;
+    minutesRemaining?: number;
+    nextAvailableTime?: Date;
+  }> {
     if (!isClientSide()) {
       return { canComplete: false, message: 'Server-side execution not allowed' };
     }
@@ -209,6 +240,11 @@ export class ProductTaskService {
       // Check if product cycle is complete
       if (task.cycleDaysCompleted >= task.cycleDays) {
         return { canComplete: false, message: 'Product cycle completed' };
+      }
+
+      // Check if task is expired
+      if (task.isExpired) {
+        return { canComplete: false, message: 'Product has expired' };
       }
 
       // Check if already completed today
@@ -224,14 +260,23 @@ export class ProductTaskService {
       if (task.lastCompletedAt) {
         const now = new Date();
         const lastCompleted = task.lastCompletedAt.toDate();
-        const hoursSinceLastCompletion = (now.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+        const timeSinceLastCompletion = now.getTime() - lastCompleted.getTime();
+        const hoursSinceLastCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
         
         if (hoursSinceLastCompletion < 24) {
-          const remainingHours = Math.ceil(24 - hoursSinceLastCompletion);
+          const remainingTime = (24 * 60 * 60 * 1000) - timeSinceLastCompletion;
+          const hoursRemaining = Math.floor(remainingTime / (1000 * 60 * 60));
+          const minutesRemaining = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+          
+          const nextAvailableTime = new Date(lastCompleted.getTime() + (24 * 60 * 60 * 1000));
+          
           return { 
             canComplete: false, 
-            message: `Locked for ${remainingHours} more hours`,
-            timeRemaining: remainingHours
+            message: `Locked for ${hoursRemaining}h ${minutesRemaining}m`,
+            timeRemaining: remainingTime,
+            hoursRemaining,
+            minutesRemaining,
+            nextAvailableTime
           };
         }
       }
@@ -240,6 +285,51 @@ export class ProductTaskService {
     } catch (error) {
       console.error('Error checking task completion status:', error);
       return { canComplete: false, message: 'Error checking task status' };
+    }
+  }
+
+  // Check and expire completed tasks
+  static async checkAndExpireTasks(): Promise<void> {
+    if (!isClientSide()) {
+      console.warn('Firebase not initialized on server, cannot check task expiration');
+      return;
+    }
+    try {
+      const allTasks = await this.getAllTasks();
+      const now = new Date();
+      
+      for (const task of allTasks) {
+        if (task.isExpired) continue;
+        
+        // Check if cycle is complete
+        if (task.cycleDaysCompleted >= task.cycleDays) {
+          const taskDoc = doc(db, this.COLLECTION, task.id);
+          await updateDoc(taskDoc, {
+            isExpired: true,
+            updatedAt: serverTimestamp()
+          });
+          console.log(`[ProductTask] Task ${task.id} expired - cycle completed`);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking task expiration:', error);
+    }
+  }
+
+  // Get all tasks (admin function)
+  static async getAllTasks(): Promise<ProductTask[]> {
+    if (!isClientSide()) {
+      return [];
+    }
+    try {
+      const querySnapshot = await getDocs(collection(db, this.COLLECTION));
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ProductTask[];
+    } catch (error) {
+      console.error('Error getting all tasks:', error);
+      return [];
     }
   }
 
@@ -264,6 +354,7 @@ export class ProductTaskService {
     cycleDaysCompleted: number;
     cycleDays: number;
     progress: number;
+    remainingDays: number;
   } | null> {
     if (!isClientSide()) {
       return null;
@@ -273,13 +364,15 @@ export class ProductTaskService {
       if (!task) return null;
 
       const progress = Math.min((task.totalEarned / task.totalExpected) * 100, 100);
+      const remainingDays = Math.max(0, task.cycleDays - task.cycleDaysCompleted);
 
       return {
         totalEarned: task.totalEarned,
         totalExpected: task.totalExpected,
         cycleDaysCompleted: task.cycleDaysCompleted,
         cycleDays: task.cycleDays,
-        progress
+        progress,
+        remainingDays
       };
     } catch (error) {
       console.error('Error getting task progress:', error);
