@@ -115,20 +115,32 @@ export default function MyProductsPage() {
       setLoading(true);
       console.log('[PRODUCTS] Loading products for user:', user.uid);
       
-      const products = await ProductService.getUserProducts(user.uid);
+      // Add a timeout fallback to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Loading timeout')), 10000)
+      );
+      
+      const products = await Promise.race([
+        ProductService.getUserProducts(user.uid),
+        timeoutPromise
+      ]) as PurchasedProduct[];
+      
       console.log('[PRODUCTS] Loaded products:', products);
       
       setPurchasedProducts(products);
       
       // Load tasks for each product
       if (products.length > 0) {
+        console.log('[PRODUCTS] Products found, loading tasks...');
         setLoadingTasks(true);
         await loadProductTasks(products);
         setLoadingTasks(false);
+        setLoading(false); // Set loading to false after tasks are loaded
+        console.log('[PRODUCTS] Tasks loaded, loading complete');
       } else {
         console.log('[PRODUCTS] No products found, skipping task loading');
-        // Set loading to false immediately if no products
-        setLoading(false);
+        setLoading(false); // Set loading to false immediately if no products
+        console.log('[PRODUCTS] Loading set to false for no products');
       }
     } catch (error) {
       console.error('[PRODUCTS] Failed to load purchased products:', error);
