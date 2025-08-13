@@ -127,13 +127,13 @@ export default function MyProductsPage() {
         setLoadingTasks(false);
       } else {
         console.log('[PRODUCTS] No products found, skipping task loading');
+        // Set loading to false immediately if no products
+        setLoading(false);
       }
     } catch (error) {
       console.error('[PRODUCTS] Failed to load purchased products:', error);
       setPurchasedProducts([]);
-    } finally {
       setLoading(false);
-      console.log('[PRODUCTS] Loading completed');
     }
   };
 
@@ -290,20 +290,7 @@ export default function MyProductsPage() {
     );
   }
 
-  if (loadingTasks) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading product tasks...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!loading && purchasedProducts.length === 0) {
+  if (purchasedProducts.length === 0) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -389,6 +376,9 @@ export default function MyProductsPage() {
                         <div className="flex items-center gap-2 mb-3">
                           <Target className="h-5 w-5 text-primary" />
                           <h3 className="font-semibold">Daily Task</h3>
+                          {loadingTasks && (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          )}
                         </div>
                         
                         {task ? (
