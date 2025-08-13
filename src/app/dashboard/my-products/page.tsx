@@ -87,6 +87,7 @@ export default function MyProductsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [purchasedProducts, setPurchasedProducts] = useState<PurchasedProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [productTasks, setProductTasks] = useState<Map<string, ProductTask>>(new Map());
   const [taskStatuses, setTaskStatuses] = useState<Map<string, TaskStatus>>(new Map());
   const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number }>>(new Map());
@@ -112,15 +113,27 @@ export default function MyProductsPage() {
     
     try {
       setLoading(true);
+      console.log('[PRODUCTS] Loading products for user:', user.uid);
+      
       const products = await ProductService.getUserProducts(user.uid);
+      console.log('[PRODUCTS] Loaded products:', products);
+      
       setPurchasedProducts(products);
       
       // Load tasks for each product
-      await loadProductTasks(products);
+      if (products.length > 0) {
+        setLoadingTasks(true);
+        await loadProductTasks(products);
+        setLoadingTasks(false);
+      } else {
+        console.log('[PRODUCTS] No products found, skipping task loading');
+      }
     } catch (error) {
-      console.error('Failed to load purchased products:', error);
+      console.error('[PRODUCTS] Failed to load purchased products:', error);
+      setPurchasedProducts([]);
     } finally {
       setLoading(false);
+      console.log('[PRODUCTS] Loading completed');
     }
   };
 
@@ -277,7 +290,20 @@ export default function MyProductsPage() {
     );
   }
 
-  if (purchasedProducts.length === 0) {
+  if (loadingTasks) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading product tasks...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loading && purchasedProducts.length === 0) {
     return (
       <div className="container mx-auto p-6">
         <Card>
