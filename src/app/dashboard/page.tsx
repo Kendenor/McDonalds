@@ -953,46 +953,6 @@ export default function DashboardPage() {
     <div className="space-y-6">
        <InfoPopup open={showPopup} onOpenChange={setShowPopup} />
        
-       {/* Investment Success Banner */}
-       {showInvestmentSuccess && (
-         <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700/40">
-           <CardContent className="p-6">
-             <div className="flex items-center justify-between">
-               <div className="flex items-center gap-4">
-                 <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-full">
-                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                 </div>
-                 <div>
-                   <h3 className="font-bold text-lg text-green-800 dark:text-green-200">
-                     Investment Successful! 🎉
-                   </h3>
-                   <p className="text-sm text-green-600 dark:text-green-300 mb-2">
-                     You have successfully invested in <strong>{lastInvestedProduct}</strong>.
-                   </p>
-                   <p className="text-sm text-green-600 dark:text-green-300">
-                     <strong>Daily tasks are now available!</strong> Complete 5 actions daily to earn rewards.
-                   </p>
-                 </div>
-               </div>
-               <div className="flex gap-2">
-                 <Link href="/dashboard/my-products">
-                   <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                     Start Daily Tasks
-                   </Button>
-                 </Link>
-                 <Button 
-                   variant="outline" 
-                   size="sm" 
-                   onClick={() => setShowInvestmentSuccess(false)}
-                 >
-                   Dismiss
-                 </Button>
-               </div>
-             </div>
-           </CardContent>
-         </Card>
-       )}
-       
       <div className="relative h-48 w-full rounded-2xl overflow-hidden">
         <Image
           src="/images/promo-banner.png"
@@ -1060,29 +1020,68 @@ export default function DashboardPage() {
         </Card>
 
         {userData?.hasDeposited ? (
-            <Card className="bg-primary/10 border-primary/20">
+            <Card className="bg-gradient-to-r from-primary/20 to-primary/10 border-primary/20">
                 <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-primary/20 rounded-lg">
-                            <CalendarCheck className="text-primary" size={24} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-lg">Daily Check-in</h3>
-                            {canCheckIn ? (
-                                <p className="text-sm text-muted-foreground">Earn ₦50 daily bonus!</p>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    Next check-in available in: {timeRemaining ? 
-                                        `${timeRemaining.hours.toString().padStart(2, '0')}:${timeRemaining.minutes.toString().padStart(2, '0')}:${timeRemaining.seconds.toString().padStart(2, '0')}` : 
-                                        '00:00:00'
-                                    }
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <Button onClick={handleCheckIn} disabled={!canCheckIn}>
-                        {canCheckIn ? 'Check-in' : 'Checked-in'}
-                    </Button>
+                    {showInvestmentSuccess ? (
+                        // Investment Success Message
+                        <>
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-full">
+                                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-green-800 dark:text-green-200">
+                                        Investment Successful! 🎉
+                                    </h3>
+                                    <p className="text-sm text-green-600 dark:text-green-300 mb-2">
+                                        You have successfully invested in <strong>{lastInvestedProduct}</strong>.
+                                    </p>
+                                    <p className="text-sm text-green-600 dark:text-green-300">
+                                        <strong>Daily tasks are now available!</strong> Complete 5 actions daily to earn rewards.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <Link href="/dashboard/my-products">
+                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                                        Start Daily Tasks
+                                    </Button>
+                                </Link>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setShowInvestmentSuccess(false)}
+                                >
+                                    Dismiss
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        // Normal Check-in Content
+                        <>
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-primary/20 rounded-lg">
+                                    <CalendarCheck className="text-primary" size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg">Daily Check-in</h3>
+                                    {canCheckIn ? (
+                                        <p className="text-sm text-muted-foreground">Earn ₦50 daily bonus!</p>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            Next check-in available in: {timeRemaining ? 
+                                                `${timeRemaining.hours.toString().padStart(2, '0')}:${timeRemaining.minutes.toString().padStart(2, '0')}:${timeRemaining.seconds.toString().padStart(2, '0')}` : 
+                                                '00:00:00'
+                                            }
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <Button onClick={handleCheckIn} disabled={!canCheckIn}>
+                                {canCheckIn ? 'Check-in' : 'Checked-in'}
+                            </Button>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         ) : (
