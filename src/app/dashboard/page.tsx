@@ -327,7 +327,16 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [showInvestmentSuccess, setShowInvestmentSuccess] = useState(false);
-  const [lastInvestedProduct, setLastInvestedProduct] = useState<string>('');
+  const [lastInvestedProduct, setLastInvestedProduct] = useState('');
+
+  // Check if user has purchased any Basic products
+  const hasBasicProducts = useMemo(() => {
+    if (!userData?.purchasedProducts) return false;
+    return userData.purchasedProducts.some((product: any) => 
+      product.planType === 'Basic' && product.status === 'Active'
+    );
+  }, [userData?.purchasedProducts]);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -366,40 +375,61 @@ export default function DashboardPage() {
   }, []);
 
   const handleInvest = async (product: any) => {
-    if (!user || !userData) return;
+    if (!user || !userData) {
+      toast({ 
+        variant: "destructive", 
+        title: "Authentication Error", 
+        description: "Please log in to invest." 
+      });
+      return;
+    }
 
-    // Check if Firebase is properly initialized
+    // Determine plan type
+    const planType: 'Basic' | 'Special' | 'Premium' = product.id.startsWith('basic') ? 'Basic' : 
+                    product.id.startsWith('special') ? 'Special' : 'Premium';
+
+    // Check if user is trying to purchase Special or Premium without Basic products
+    if ((planType === 'Special' || planType === 'Premium') && !hasBasicProducts) {
+      toast({ 
+        variant: "destructive", 
+        title: "Purchase Restriction", 
+        description: "You must purchase at least one Basic Plan to unlock Special and Premium Plans." 
+      });
+      return;
+    }
+
+    // Check if Firebase is initialized
     if (!db) {
-      console.error('[DASHBOARD] Firebase database not initialized');
+      console.error('[DASHBOARD] Firebase not initialized');
       toast({ 
         variant: "destructive", 
         title: "System Error", 
-        description: "Database connection not available. Please refresh the page and try again." 
+        description: "Database connection failed. Please refresh and try again." 
       });
       return;
     }
 
     // Check if user is authenticated
     if (!auth.currentUser) {
-      console.error('[DASHBOARD] User not authenticated');
+      console.error('[DASHBOARD] No authenticated user');
       toast({ 
         variant: "destructive", 
         title: "Authentication Error", 
-        description: "You must be logged in to make investments. Please log in and try again." 
+        description: "Please log in to invest." 
       });
       return;
     }
 
-    // Verify user ID matches
+    // Check if user ID matches
     if (auth.currentUser.uid !== user.uid) {
       console.error('[DASHBOARD] User ID mismatch:', auth.currentUser.uid, 'vs', user.uid);
-            toast({ 
-                variant: "destructive", 
+      toast({ 
+        variant: "destructive", 
         title: "Authentication Error", 
         description: "User session mismatch. Please refresh the page and try again." 
-            });
-            return;
-        }
+      });
+      return;
+    }
         
     const currentBalance = userData.balance || 0;
     if (currentBalance < product.price) {
@@ -431,18 +461,6 @@ export default function DashboardPage() {
         console.log('[DASHBOARD] Transaction record created successfully');
     
         toast({ title: "Investment Successful!", description: `You have invested in ${product.name}.`});
-
-        // Determine plan type
-      const planType: 'Basic' | 'Special' | 'Premium' = product.id.startsWith('basic') ? 'Basic' : 
-                        product.id.startsWith('special') ? 'Special' : 'Premium';
-
-      console.log('[DASHBOARD] Product type determined:', {
-          productId: product.id,
-          planType: planType,
-          isBasic: product.id.startsWith('basic'),
-          isSpecial: product.id.startsWith('special'),
-          isPremium: product.id.startsWith('premium')
-      });
 
         // Calculate start and end dates
         const startDate = new Date();
@@ -1022,66 +1040,27 @@ export default function DashboardPage() {
         {userData?.hasDeposited ? (
             <Card className="bg-gradient-to-r from-primary/20 to-primary/10 border-primary/20">
                 <CardContent className="p-4 flex items-center justify-between">
-                    {showInvestmentSuccess ? (
-                        // Investment Success Message
-                        <>
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-full">
-                                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg text-green-800 dark:text-green-200">
-                                        Investment Successful! 🎉
-                                    </h3>
-                                    <p className="text-sm text-green-600 dark:text-green-300 mb-2">
-                                        You have successfully invested in <strong>{lastInvestedProduct}</strong>.
-                                    </p>
-                                    <p className="text-sm text-green-600 dark:text-green-300">
-                                        <strong>Daily tasks are now available!</strong> Complete 5 actions daily to earn rewards.
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <Link href="/dashboard/my-products">
-                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                                        Start Daily Tasks
-                                    </Button>
-                                </Link>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => setShowInvestmentSuccess(false)}
-                                >
-                                    Dismiss
-                                </Button>
-                            </div>
-                        </>
-                    ) : (
-                        // Normal Check-in Content
-                        <>
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-primary/20 rounded-lg">
-                                    <CalendarCheck className="text-primary" size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg">Daily Check-in</h3>
-                                    {canCheckIn ? (
-                                        <p className="text-sm text-muted-foreground">Earn ₦50 daily bonus!</p>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                            Next check-in available in: {timeRemaining ? 
-                                                `${timeRemaining.hours.toString().padStart(2, '0')}:${timeRemaining.minutes.toString().padStart(2, '0')}:${timeRemaining.seconds.toString().padStart(2, '0')}` : 
-                                                '00:00:00'
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <Button onClick={handleCheckIn} disabled={!canCheckIn}>
-                                {canCheckIn ? 'Check-in' : 'Checked-in'}
-                            </Button>
-                        </>
-                    )}
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-primary/20 rounded-lg">
+                            <CalendarCheck className="text-primary" size={24} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg">Daily Check-in</h3>
+                            {canCheckIn ? (
+                                <p className="text-sm text-muted-foreground">Earn ₦50 daily bonus!</p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    Next check-in available in: {timeRemaining ? 
+                                        `${timeRemaining.hours.toString().padStart(2, '0')}:${timeRemaining.minutes.toString().padStart(2, '0')}:${timeRemaining.seconds.toString().padStart(2, '0')}` : 
+                                        '00:00:00'
+                                    }
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <Button onClick={handleCheckIn} disabled={!canCheckIn}>
+                        {canCheckIn ? 'Check-in' : 'Checked-in'}
+                    </Button>
                 </CardContent>
             </Card>
         ) : (
