@@ -539,12 +539,13 @@ export default function DashboardPage() {
         }
 
         // Create product-specific daily task
-        await ProductTaskService.createProductTask(
+        const productTaskService = new ProductTaskService();
+        await productTaskService.createProductTask(
             user.uid,
             product.id,
             product.name,
-            product.cycleDays,
-            product.total
+            product.total,
+            product.cycleDays
         );
 
         // Update canAccessSpecialPlans if this is a basic plan
@@ -688,7 +689,8 @@ export default function DashboardPage() {
         await ProductService.checkAndResetExpiredProducts();
         
         // Check for expired tasks
-        await ProductTaskService.checkAndExpireTasks();
+        const productTaskService = new ProductTaskService();
+        await productTaskService.checkAndExpireTasks();
         
         // Load investment plans from service
         const basicPlans = InvestmentPlanService.getBasicPlans().map(plan => ({

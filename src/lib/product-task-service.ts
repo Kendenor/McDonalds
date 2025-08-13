@@ -1,382 +1,385 @@
 import { db } from './firebase';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  addDoc, 
-  updateDoc,
-  serverTimestamp,
-  getDocs,
-  query,
-  where,
-  Timestamp
-} from 'firebase/firestore';
-
-// Helper function to check if we're on client side
-function isClientSide() {
-  return typeof window !== 'undefined';
-}
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 
 export interface ProductTask {
   id: string;
   userId: string;
   productId: string;
   productName: string;
-  taskType: 'product_daily_task';
-  title: string;
-  description: string;
-  reward: number;
+  dailyReward: number;
   maxCompletions: number;
   completionsToday: number;
-  completed: boolean;
-  lastCompletedAt: Timestamp | null;
+  lastCompletedAt: Date | null;
   cycleDays: number;
   cycleDaysCompleted: number;
   totalEarned: number;
   totalExpected: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
   isExpired: boolean;
-  nextAvailableTime?: Timestamp;
+  nextAvailableTime: Date | null;
+  // Task performance system
+  requiredActions: number;
+  completedActions: number;
+  currentActionStep: number;
+  actionTypes: string[];
+  lastActionTime: Date | null;
 }
 
-// Product Task Service
+export interface TaskAction {
+  id: string;
+  type: string;
+  description: string;
+  completed: boolean;
+  completedAt?: Date;
+}
+
 export class ProductTaskService {
-  private static COLLECTION = 'product_tasks';
+  private collectionName = 'product_tasks';
 
-  // Create a product task when user purchases a product
-  static async createProductTask(
-    userId: string, 
-    productId: string, 
-    productName: string, 
-    cycleDays: number,
-    totalExpected: number
-  ): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot create product task');
-      return;
-    }
+  async createProductTask(
+    userId: string,
+    productId: string,
+    productName: string,
+    totalReturn: number,
+    cycleDays: number
+  ): Promise<ProductTask> {
+    const dailyReward = Math.floor(totalReturn / cycleDays);
+    const taskId = `${userId}_${productId}`;
+    
+    const task: ProductTask = {
+      id: taskId,
+      userId,
+      productId,
+      productName,
+      dailyReward,
+      maxCompletions: 1,
+      completionsToday: 0,
+      lastCompletedAt: null,
+      cycleDays,
+      cycleDaysCompleted: 0,
+      totalEarned: 0,
+      totalExpected: totalReturn,
+      isExpired: false,
+      nextAvailableTime: null,
+      // Task performance system
+      requiredActions: 5,
+      completedActions: 0,
+      currentActionStep: 1,
+      actionTypes: ['view_earnings', 'check_balance', 'read_news', 'update_profile', 'share_platform'],
+      lastActionTime: null
+    };
+
     try {
-      // Calculate daily reward: Total Return / Cycle Days
-      // This ensures users earn the full total return over the cycle period
-      const dailyReward = Math.floor(totalExpected / cycleDays);
-      
-      const productTask = {
-        userId,
-        productId,
-        productName,
-        taskType: 'product_daily_task',
-        title: `Daily Task - ${productName}`,
-        description: `Complete daily task for ${productName}. Earn ₦${dailyReward.toLocaleString()} per completion. Complete ${cycleDays} times to earn ₦${totalExpected.toLocaleString()}.`,
-        reward: dailyReward,
-        maxCompletions: 1, // One completion per day
-        completionsToday: 0,
-        completed: false,
-        lastCompletedAt: null,
-        cycleDays,
-        cycleDaysCompleted: 0,
-        totalEarned: 0,
-        totalExpected,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        isExpired: false,
-        nextAvailableTime: null
-      };
-
-      await addDoc(collection(db, this.COLLECTION), productTask);
-      console.log(`[ProductTask] Created product task for ${productName} with daily reward: ₦${dailyReward.toLocaleString()}`);
+      await setDoc(doc(db, this.collectionName, taskId), task);
+      console.log(`[TASK] Created product task for ${productName}`);
+      return task;
     } catch (error) {
-      console.error('Error creating product task:', error);
+      console.error('[ERROR] Failed to create product task:', error);
+      throw error;
     }
   }
 
-  // Get all product tasks for a user
-  static async getUserProductTasks(userId: string): Promise<ProductTask[]> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot get product tasks');
-      return [];
-    }
+  async getProductTask(userId: string, productId: string): Promise<ProductTask | null> {
     try {
-      const q = query(collection(db, this.COLLECTION), where('userId', '==', userId));
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ProductTask[];
-    } catch (error) {
-      console.error('Error getting user product tasks:', error);
-      return [];
-    }
-  }
-
-  // Get a specific product task
-  static async getProductTask(taskId: string): Promise<ProductTask | null> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot get product task');
-      return null;
-    }
-    try {
-      const taskDoc = doc(db, this.COLLECTION, taskId);
-      const taskSnapshot = await getDoc(taskDoc);
+      const taskId = `${userId}_${productId}`;
+      const taskDoc = await getDoc(doc(db, this.collectionName, taskId));
       
-      if (taskSnapshot.exists()) {
+      if (taskDoc.exists()) {
+        const data = taskDoc.data();
         return {
-          id: taskSnapshot.id,
-          ...taskSnapshot.data()
+          ...data,
+          lastCompletedAt: data.lastCompletedAt ? new Date(data.lastCompletedAt.toDate()) : null,
+          nextAvailableTime: data.nextAvailableTime ? new Date(data.nextAvailableTime.toDate()) : null,
+          lastActionTime: data.lastActionTime ? new Date(data.lastActionTime.toDate()) : null
         } as ProductTask;
       }
       return null;
     } catch (error) {
-      console.error('Error getting product task:', error);
+      console.error('[ERROR] Failed to get product task:', error);
       return null;
     }
   }
 
-  // Complete a product daily task
-  static async completeProductTask(taskId: string): Promise<{ success: boolean; message: string; reward?: number; nextAvailableTime?: Date }> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot complete product task');
-      return { success: false, message: 'Server-side execution not allowed' };
-    }
+  async completeTaskAction(
+    userId: string,
+    productId: string,
+    actionType: string
+  ): Promise<{ success: boolean; message: string; progress: number }> {
     try {
-      const task = await this.getProductTask(taskId);
+      const task = await this.getProductTask(userId, productId);
+      if (!task) {
+        return { success: false, message: 'Task not found', progress: 0 };
+      }
+
+      if (task.isExpired) {
+        return { success: false, message: 'Product cycle completed, task expired', progress: task.completedActions };
+      }
+
+      // Check if action type is valid
+      if (!task.actionTypes.includes(actionType)) {
+        return { success: false, message: 'Invalid action type', progress: task.completedActions };
+      }
+
+      // Check if action was already completed today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (task.lastActionTime && task.lastActionTime >= today) {
+        // Check if this specific action was already completed
+        const actionIndex = task.actionTypes.indexOf(actionType);
+        if (task.completedActions > actionIndex) {
+          return { success: false, message: 'This action was already completed today', progress: task.completedActions };
+        }
+      }
+
+      // Complete the action
+      const newCompletedActions = task.completedActions + 1;
+      const progress = Math.floor((newCompletedActions / task.requiredActions) * 100);
+
+      await updateDoc(doc(db, this.collectionName, task.id), {
+        completedActions: newCompletedActions,
+        currentActionStep: newCompletedActions + 1,
+        lastActionTime: new Date()
+      });
+
+      console.log(`[TASK] Completed action ${actionType} for ${task.productName}, progress: ${progress}%`);
+
+      return {
+        success: true,
+        message: `Action completed! Progress: ${newCompletedActions}/${task.requiredActions}`,
+        progress
+      };
+    } catch (error) {
+      console.error('[ERROR] Failed to complete task action:', error);
+      return { success: false, message: 'Failed to complete action', progress: 0 };
+    }
+  }
+
+  async completeProductTask(
+    userId: string,
+    productId: string
+  ): Promise<{ success: boolean; message: string; reward?: number }> {
+    try {
+      const task = await this.getProductTask(userId, productId);
       if (!task) {
         return { success: false, message: 'Task not found' };
       }
 
-      // Check if product cycle is complete
-      if (task.cycleDaysCompleted >= task.cycleDays) {
-        return { success: false, message: 'Product cycle completed. No more tasks available.' };
-      }
-
-      // Check if task is expired
       if (task.isExpired) {
-        return { success: false, message: 'Product has expired. No more tasks available.' };
+        return { success: false, message: 'Product cycle completed, task expired' };
       }
 
-      // Check if already completed today
-      const today = new Date().toISOString().split('T')[0];
-      const lastCompletedDate = task.lastCompletedAt ? 
-        new Date(task.lastCompletedAt.toDate()).toISOString().split('T')[0] : null;
-
-      if (lastCompletedDate === today && task.completionsToday >= task.maxCompletions) {
-        return { success: false, message: 'Task already completed today. Try again tomorrow.' };
+      // Check if all actions are completed
+      if (task.completedActions < task.requiredActions) {
+        const remaining = task.requiredActions - task.completedActions;
+        return { 
+          success: false, 
+          message: `Complete ${remaining} more action${remaining > 1 ? 's' : ''} to earn your daily reward` 
+        };
       }
 
-      // Check if 24 hours have passed since last completion
+      // Check 24-hour cooldown
       if (task.lastCompletedAt) {
         const now = new Date();
-        const lastCompleted = task.lastCompletedAt.toDate();
-        const hoursSinceLastCompletion = (now.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+        const timeSinceLastCompletion = now.getTime() - task.lastCompletedAt.getTime();
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
-        if (hoursSinceLastCompletion < 24) {
-          const remainingHours = Math.ceil(24 - hoursSinceLastCompletion);
-          return { success: false, message: `Task locked. Available in ${remainingHours} hours.` };
-        }
-      }
-
-      // Complete the task
-      const taskDoc = doc(db, this.COLLECTION, taskId);
-      const newCompletionsToday = lastCompletedDate === today ? task.completionsToday + 1 : 1;
-      const newTotalEarned = task.totalEarned + task.reward;
-      const newCycleDaysCompleted = Math.floor(newTotalEarned / task.reward);
-      
-      // Calculate next available time (24 hours from now)
-      const now = new Date();
-      const nextAvailableTime = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-
-      // Check if this completes the cycle
-      const isCycleComplete = newCycleDaysCompleted >= task.cycleDays;
-      const isExpired = isCycleComplete;
-
-      await updateDoc(taskDoc, {
-        completionsToday: newCompletionsToday,
-        lastCompletedAt: serverTimestamp(),
-        totalEarned: newTotalEarned,
-        cycleDaysCompleted: newCycleDaysCompleted,
-        completed: isCycleComplete,
-        isExpired: isExpired,
-        nextAvailableTime: serverTimestamp(nextAvailableTime),
-        updatedAt: serverTimestamp()
-      });
-
-      // Add reward to user balance
-      const { UserService } = await import('./user-service');
-      await UserService.addToBalance(task.userId, task.reward, 'Product_Task_Reward');
-
-      console.log(`[ProductTask] Task completed for ${task.productName}. Earned: ₦${task.reward.toLocaleString()}, Total: ₦${newTotalEarned.toLocaleString()}/${task.totalExpected.toLocaleString()}`);
-
-      return { 
-        success: true, 
-        message: `Task completed! Earned ₦${task.reward.toLocaleString()}`,
-        reward: task.reward,
-        nextAvailableTime: nextAvailableTime
-      };
-    } catch (error) {
-      console.error('Error completing product task:', error);
-      return { success: false, message: 'Error completing task' };
-    }
-  }
-
-  // Check if user can complete a product task
-  static async canCompleteProductTask(taskId: string): Promise<{ 
-    canComplete: boolean; 
-    message: string; 
-    timeRemaining?: number;
-    hoursRemaining?: number;
-    minutesRemaining?: number;
-    nextAvailableTime?: Date;
-  }> {
-    if (!isClientSide()) {
-      return { canComplete: false, message: 'Server-side execution not allowed' };
-    }
-    try {
-      const task = await this.getProductTask(taskId);
-      if (!task) {
-        return { canComplete: false, message: 'Task not found' };
-      }
-
-      // Check if product cycle is complete
-      if (task.cycleDaysCompleted >= task.cycleDays) {
-        return { canComplete: false, message: 'Product cycle completed' };
-      }
-
-      // Check if task is expired
-      if (task.isExpired) {
-        return { canComplete: false, message: 'Product has expired' };
-      }
-
-      // Check if already completed today
-      const today = new Date().toISOString().split('T')[0];
-      const lastCompletedDate = task.lastCompletedAt ? 
-        new Date(task.lastCompletedAt.toDate()).toISOString().split('T')[0] : null;
-
-      if (lastCompletedDate === today && task.completionsToday >= task.maxCompletions) {
-        return { canComplete: false, message: 'Already completed today' };
-      }
-
-      // Check if 24 hours have passed since last completion
-      if (task.lastCompletedAt) {
-        const now = new Date();
-        const lastCompleted = task.lastCompletedAt.toDate();
-        const timeSinceLastCompletion = now.getTime() - lastCompleted.getTime();
-        const hoursSinceLastCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
-        
-        if (hoursSinceLastCompletion < 24) {
-          const remainingTime = (24 * 60 * 60 * 1000) - timeSinceLastCompletion;
-          const hoursRemaining = Math.floor(remainingTime / (1000 * 60 * 60));
-          const minutesRemaining = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-          
-          const nextAvailableTime = new Date(lastCompleted.getTime() + (24 * 60 * 60 * 1000));
-          
+        if (hoursRemaining > 0) {
+          const hours = Math.floor(hoursRemaining);
+          const minutes = Math.floor((hoursRemaining - hours) * 60);
           return { 
-            canComplete: false, 
-            message: `Locked for ${hoursRemaining}h ${minutesRemaining}m`,
-            timeRemaining: remainingTime,
-            hoursRemaining,
-            minutesRemaining,
-            nextAvailableTime
+            success: false, 
+            message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.` 
           };
         }
       }
 
-      return { canComplete: true, message: 'Task available' };
+      // Complete the task and give reward
+      const newTotalEarned = task.totalEarned + task.dailyReward;
+      const newCycleDaysCompleted = task.cycleDaysCompleted + 1;
+      const isExpired = newCycleDaysCompleted >= task.cycleDays;
+
+      // Calculate next available time (24 hours from now)
+      const nextAvailableTime = new Date();
+      nextAvailableTime.setHours(nextAvailableTime.getHours() + 24);
+
+      // Reset actions for next day
+      const newCompletedActions = 0;
+      const newCurrentActionStep = 1;
+
+      await updateDoc(doc(db, this.collectionName, task.id), {
+        totalEarned: newTotalEarned,
+        cycleDaysCompleted: newCycleDaysCompleted,
+        isExpired,
+        nextAvailableTime,
+        lastCompletedAt: new Date(),
+        completedActions: newCompletedActions,
+        currentActionStep: newCurrentActionStep,
+        lastActionTime: null
+      });
+
+      console.log(`[TASK] Completed daily task for ${task.productName}, earned ₦${task.dailyReward}`);
+
+      return {
+        success: true,
+        message: `Daily task completed! Earned ₦${task.dailyReward.toLocaleString()}`,
+        reward: task.dailyReward
+      };
     } catch (error) {
-      console.error('Error checking task completion status:', error);
-      return { canComplete: false, message: 'Error checking task status' };
+      console.error('[ERROR] Failed to complete product task:', error);
+      return { success: false, message: 'Failed to complete task' };
     }
   }
 
-  // Check and expire completed tasks
-  static async checkAndExpireTasks(): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot check task expiration');
-      return;
-    }
+  async canCompleteProductTask(
+    userId: string,
+    productId: string
+  ): Promise<{ 
+    canComplete: boolean; 
+    message: string; 
+    hoursRemaining?: number; 
+    minutesRemaining?: number;
+    progress: number;
+    remainingActions: number;
+  }> {
     try {
-      const allTasks = await this.getAllTasks();
-      const now = new Date();
-      
-      for (const task of allTasks) {
-        if (task.isExpired) continue;
+      const task = await this.getProductTask(userId, productId);
+      if (!task) {
+        return { 
+          canComplete: false, 
+          message: 'Task not found',
+          progress: 0,
+          remainingActions: 0
+        };
+      }
+
+      if (task.isExpired) {
+        return { 
+          canComplete: false, 
+          message: 'Product cycle completed, task expired',
+          progress: 0,
+          remainingActions: 0
+        };
+      }
+
+      // Check if all actions are completed
+      if (task.completedActions < task.requiredActions) {
+        const remaining = task.requiredActions - task.completedActions;
+        const progress = Math.floor((task.completedActions / task.requiredActions) * 100);
+        return { 
+          canComplete: false, 
+          message: `Complete ${remaining} more action${remaining > 1 ? 's' : ''} to earn your daily reward`,
+          progress,
+          remainingActions: remaining
+        };
+      }
+
+      // Check 24-hour cooldown
+      if (task.lastCompletedAt) {
+        const now = new Date();
+        const timeSinceLastCompletion = now.getTime() - task.lastCompletedAt.getTime();
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
-        // Check if cycle is complete
-        if (task.cycleDaysCompleted >= task.cycleDays) {
-          const taskDoc = doc(db, this.COLLECTION, task.id);
-          await updateDoc(taskDoc, {
-            isExpired: true,
-            updatedAt: serverTimestamp()
-          });
-          console.log(`[ProductTask] Task ${task.id} expired - cycle completed`);
+        if (hoursRemaining > 0) {
+          const hours = Math.floor(hoursRemaining);
+          const minutes = Math.floor((hoursRemaining - hours) * 60);
+          return { 
+            canComplete: false, 
+            message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.`,
+            hoursRemaining: hours,
+            minutesRemaining: minutes,
+            progress: 100,
+            remainingActions: 0
+          };
         }
       }
+
+      return { 
+        canComplete: true, 
+        message: 'Ready to complete daily task!',
+        progress: 100,
+        remainingActions: 0
+      };
     } catch (error) {
-      console.error('Error checking task expiration:', error);
+      console.error('[ERROR] Failed to check task completion status:', error);
+      return { 
+        canComplete: false, 
+        message: 'Error checking task status',
+        progress: 0,
+        remainingActions: 0
+      };
     }
   }
 
-  // Get all tasks (admin function)
-  static async getAllTasks(): Promise<ProductTask[]> {
-    if (!isClientSide()) {
-      return [];
-    }
+  async checkAndExpireTasks(): Promise<void> {
     try {
-      const querySnapshot = await getDocs(collection(db, this.COLLECTION));
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ProductTask[];
+      const tasksQuery = query(collection(db, this.collectionName));
+      const querySnapshot = await getDocs(tasksQuery);
+      
+      const updatePromises: Promise<void>[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.cycleDaysCompleted >= data.cycleDays && !data.isExpired) {
+          updatePromises.push(
+            updateDoc(doc.ref, { isExpired: true })
+          );
+        }
+      });
+      
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(`[TASK] Expired ${updatePromises.length} completed tasks`);
+      }
     } catch (error) {
-      console.error('Error getting all tasks:', error);
-      return [];
+      console.error('[ERROR] Failed to check and expire tasks:', error);
     }
   }
 
-  // Delete product task when product expires or is cancelled
-  static async deleteProductTask(taskId: string): Promise<void> {
-    if (!isClientSide()) {
-      console.warn('Firebase not initialized on server, cannot delete product task');
-      return;
-    }
-    try {
-      const taskDoc = doc(db, this.COLLECTION, taskId);
-      await taskDoc.delete();
-    } catch (error) {
-      console.error('Error deleting product task:', error);
-    }
-  }
-
-  // Get task progress for a specific product
-  static async getProductTaskProgress(taskId: string): Promise<{
-    totalEarned: number;
-    totalExpected: number;
-    cycleDaysCompleted: number;
-    cycleDays: number;
+  async getProductTaskProgress(
+    userId: string,
+    productId: string
+  ): Promise<{
     progress: number;
     remainingDays: number;
+    totalEarned: number;
+    totalExpected: number;
+    isExpired: boolean;
+    completedActions: number;
+    requiredActions: number;
   } | null> {
-    if (!isClientSide()) {
-      return null;
-    }
     try {
-      const task = await this.getProductTask(taskId);
+      const task = await this.getProductTask(userId, productId);
       if (!task) return null;
 
-      const progress = Math.min((task.totalEarned / task.totalExpected) * 100, 100);
+      const progress = Math.floor((task.cycleDaysCompleted / task.cycleDays) * 100);
       const remainingDays = Math.max(0, task.cycleDays - task.cycleDaysCompleted);
 
       return {
+        progress,
+        remainingDays,
         totalEarned: task.totalEarned,
         totalExpected: task.totalExpected,
-        cycleDaysCompleted: task.cycleDaysCompleted,
-        cycleDays: task.cycleDays,
-        progress,
-        remainingDays
+        isExpired: task.isExpired,
+        completedActions: task.completedActions,
+        requiredActions: task.requiredActions
       };
     } catch (error) {
-      console.error('Error getting task progress:', error);
+      console.error('[ERROR] Failed to get task progress:', error);
       return null;
+    }
+  }
+
+  async resetDailyActions(userId: string, productId: string): Promise<void> {
+    try {
+      const taskId = `${userId}_${productId}`;
+      await updateDoc(doc(db, this.collectionName, taskId), {
+        completedActions: 0,
+        currentActionStep: 1,
+        lastActionTime: null
+      });
+      console.log(`[TASK] Reset daily actions for product ${productId}`);
+    } catch (error) {
+      console.error('[ERROR] Failed to reset daily actions:', error);
     }
   }
 }
