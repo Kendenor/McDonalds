@@ -106,10 +106,8 @@ export default function MyProductsPage() {
   useEffect(() => {
     if (!user) return;
 
-    console.log('[PRODUCTS] Setting up real-time listener for user:', user.uid);
-    
     const unsubscribe = ProductService.onProductsChange(user.uid, (products) => {
-      console.log('[PRODUCTS] Real-time update received:', products.length, 'products');
+      // Update products with real-time data
       setPurchasedProducts(products);
       
       // Load tasks for new products
@@ -119,7 +117,6 @@ export default function MyProductsPage() {
     });
 
     return () => {
-      console.log('[PRODUCTS] Cleaning up real-time listener');
       unsubscribe();
     };
   }, [user]);
@@ -128,7 +125,6 @@ export default function MyProductsPage() {
   useEffect(() => {
     if (loading) {
       const timeout = setTimeout(() => {
-        console.log('[PRODUCTS] Loading timeout reached, forcing loading to false');
         setLoading(false);
         setLoadingTasks(false);
       }, 15000);
@@ -145,35 +141,29 @@ export default function MyProductsPage() {
 
   const loadPurchasedProducts = async () => {
     if (!user) {
-      console.log('[PRODUCTS] No user, skipping load');
       return;
     }
     
     try {
       setLoading(true);
-      console.log('[PRODUCTS] Starting to load products for user:', user.uid);
       
-      // Load products with timeout protection
+      // Load products directly
       const products = await ProductService.getUserProducts(user.uid);
-      console.log('[PRODUCTS] Products loaded successfully:', products.length, 'products');
       
       // Set products immediately
       setPurchasedProducts(products);
       
       // If no products, stop loading immediately
       if (products.length === 0) {
-        console.log('[PRODUCTS] No products found, setting loading to false');
         setLoading(false);
         return;
       }
       
       // If products exist, load tasks in background
-      console.log('[PRODUCTS] Loading tasks for', products.length, 'products');
       setLoadingTasks(true);
       
       try {
         await loadProductTasks(products);
-        console.log('[PRODUCTS] Tasks loaded successfully');
       } catch (taskError) {
         console.error('[PRODUCTS] Error loading tasks:', taskError);
       } finally {
@@ -182,7 +172,6 @@ export default function MyProductsPage() {
       
       // Always set loading to false after products are loaded
       setLoading(false);
-      console.log('[PRODUCTS] All loading completed');
       
     } catch (error) {
       console.error('[PRODUCTS] Failed to load products:', error);
@@ -194,17 +183,13 @@ export default function MyProductsPage() {
   const loadProductTasks = async (products: PurchasedProduct[]) => {
     if (!user) return;
     
-    console.log('[PRODUCTS] Loading tasks for products:', products.map(p => ({ id: p.id, planType: p.planType, name: p.name })));
-    
     const tasksMap = new Map<string, ProductTask>();
     const statusesMap = new Map<string, TaskStatus>();
     const productTaskService = new ProductTaskService();
     
     for (const product of products) {
       try {
-        console.log(`[PRODUCTS] Loading task for product: ${product.id} (${product.planType})`);
         const task = await productTaskService.getProductTask(user.uid, product.id);
-        console.log(`[PRODUCTS] Task result for ${product.id}:`, task ? 'Found' : 'Not found');
         
         if (task) {
           tasksMap.set(product.id, task);
@@ -212,16 +197,12 @@ export default function MyProductsPage() {
           // Get task status
           const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
           statusesMap.set(product.id, status);
-          console.log(`[PRODUCTS] Task status for ${product.id}:`, status);
-        } else {
-          console.log(`[PRODUCTS] No task found for product ${product.id} (${product.planType})`);
         }
       } catch (error) {
         console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
       }
     }
     
-    console.log('[PRODUCTS] Final tasks map:', Array.from(tasksMap.keys()));
     setProductTasks(tasksMap);
     setTaskStatuses(statusesMap);
     updateCountdowns();
@@ -310,6 +291,25 @@ export default function MyProductsPage() {
     } catch (error) {
       console.error('Failed to complete task:', error);
       alert('Failed to complete task. Please try again.');
+    }
+  };
+
+  const handleClaimReturns = async (productId: string) => {
+    if (!user) return;
+
+    try {
+      const result = await ProductService.claimReturns(user.uid, productId);
+
+      if (result.success) {
+        alert(result.message);
+        // Refresh the product list to show updated status
+        loadPurchasedProducts();
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to claim returns:', error);
+      alert('Failed to claim returns. Please try again.');
     }
   };
 
@@ -525,82 +525,41 @@ export default function MyProductsPage() {
                               </div>
                             </div>
                           </>
-                        ) : product.planType === 'Special' && !task ? (
-                          // Special plan but no task created yet
-                          <div className="text-center p-4 border rounded-lg">
-                            <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                            <p className="text-sm text-muted-foreground">Task system initializing...</p>
-                          </div>
                         ) : (product.planType === 'Basic' || product.planType === 'Premium') ? (
-                          // Basic and Premium plans: Show tasks when cycle ends
-                          isCycleEnded(product) && task ? (
+                          // Basic and Premium plans: Show claim button when cycle ends
+                          isCycleEnded(product) ? (
                             <>
-                              {/* Task Progress */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span>Task Progress</span>
-                                  <span>{task.completedActions}/{task.requiredActions} Actions</span>
+                              {/* Cycle Completed - Show Claim Button */}
+                              <div className="text-center p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                                <div className="flex items-center justify-center gap-2 mb-3">
+                                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                  <span className="font-medium text-green-800 dark:text-green-200">Cycle Completed!</span>
                                 </div>
-                                <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
-                              </div>
-
-                              {/* Action Buttons */}
-                              <div className="grid grid-cols-2 gap-2">
-                                {task.actionTypes.map((actionType, index) => {
-                                  const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
-                                  const isCompleted = isActionCompleted(product.id, actionType);
-                                  
-                                  return (
-                                    <Button
-                                      key={actionType}
-                                      variant={getActionButtonVariant(product.id, actionType)}
-                                      size="sm"
-                                      onClick={() => handleCompleteAction(product.id, actionType)}
-                                      disabled={isCompleted}
-                                      className="h-10 text-xs"
-                                    >
-                                      {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                      {getActionButtonText(product.id, actionType)}
-                                    </Button>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Task Completion */}
-                              <div className="pt-3 border-t">
-                                {status?.canComplete ? (
-                                  <Button 
-                                    onClick={() => handleCompleteTask(product.id)}
-                                    className="w-full"
-                                    size="sm"
-                                  >
-                                    <Trophy className="h-4 w-4 mr-2" />
-                                    Complete Daily Task (₦{task.dailyReward.toLocaleString()})
-                                  </Button>
-                                ) : (
-                                  <div className="text-center">
-                                    {countdown ? (
-                                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                        <Clock className="h-4 w-4" />
-                                        <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
-                                      </div>
-                                    ) : (
-                                      <p className="text-sm text-muted-foreground">{status?.message}</p>
-                                    )}
+                                <p className="text-sm text-green-600 dark:text-green-300 mb-4">
+                                  Your {product.planType} plan cycle has ended. You can now claim your total returns.
+                                </p>
+                                <div className="space-y-2 mb-4">
+                                  <div className="flex justify-between text-sm">
+                                    <span>Investment Amount:</span>
+                                    <span className="font-medium">₦{product.price.toLocaleString()}</span>
                                   </div>
-                                )}
-                              </div>
-
-                              {/* Task Stats */}
-                              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                                <div className="text-center">
-                                  <p className="text-xs text-muted-foreground">Earned Today</p>
-                                  <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
+                                  <div className="flex justify-between text-sm">
+                                    <span>Total Returns:</span>
+                                    <span className="font-medium text-green-600">₦{product.totalEarning.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between text-sm font-medium">
+                                    <span>Profit:</span>
+                                    <span className="text-green-600">₦{(product.totalEarning - product.price).toLocaleString()}</span>
+                                  </div>
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-muted-foreground">Expected Total</p>
-                                  <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
-                                </div>
+                                <Button 
+                                  onClick={() => handleClaimReturns(product.id)}
+                                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                  size="sm"
+                                >
+                                  <Trophy className="h-4 w-4 mr-2" />
+                                  Claim Returns (₦{product.totalEarning.toLocaleString()})
+                                </Button>
                               </div>
                             </>
                           ) : (
@@ -608,10 +567,10 @@ export default function MyProductsPage() {
                             <div className="text-center p-4 border rounded-lg">
                               <div className="flex items-center justify-center gap-2 mb-2">
                                 <Lock className="h-6 w-6 text-muted-foreground" />
-                                <span className="font-medium">Tasks Locked</span>
+                                <span className="font-medium">Cycle in Progress</span>
                               </div>
                               <p className="text-sm text-muted-foreground mb-3">
-                                Tasks will be available when your {product.planType} plan cycle ends
+                                Your {product.planType} plan is still running. Claim button will appear when cycle ends.
                               </p>
                               <div className="text-xs text-muted-foreground">
                                 <p>Cycle Progress: {product.daysCompleted}/{product.totalDays} days</p>

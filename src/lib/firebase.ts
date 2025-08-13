@@ -28,7 +28,6 @@ try {
   auth = getAuth(app);
   db = getFirestore(app);
 } catch (error) {
-  console.warn('Firebase initialization warning:', error);
   // Continue without Firebase if initialization fails
 }
 

@@ -299,37 +299,26 @@ export class ProductService {
       console.warn('Firebase not initialized on server, returning empty array');
       return [];
     }
+    
+    if (!db) {
+      return [];
+    }
+    
     try {
-      console.log('[ProductService] Getting products for user:', userId);
-      console.log('[ProductService] Collection:', this.COLLECTION);
-      
       // Simplified query without orderBy to avoid index requirements
       const q = query(
         collection(db, this.COLLECTION), 
         where('userId', '==', userId)
       );
       
-      console.log('[ProductService] Query created, executing...');
       const querySnapshot = await getDocs(q);
-      console.log('[ProductService] Query result:', querySnapshot.docs.length, 'documents');
       
       if (querySnapshot.docs.length === 0) {
-        console.log('[ProductService] No products found for user:', userId);
         return [];
       }
       
       const products = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('[ProductService] Document data:', { id: doc.id, ...data });
-        
-        // Validate required fields
-        const requiredFields = ['userId', 'productId', 'name', 'price', 'status'];
-        const missingFields = requiredFields.filter(field => !data[field]);
-        
-        if (missingFields.length > 0) {
-          console.warn('[ProductService] Missing required fields:', missingFields, 'for document:', doc.id);
-        }
-        
         return { 
           id: doc.id, 
           ...data 
@@ -339,23 +328,7 @@ export class ProductService {
       // Sort products by purchase date in memory instead of in query
       products.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
       
-      console.log('[ProductService] Processed products:', products.length);
-      console.log('[ProductService] Products:', products);
-      
-      // Filter out invalid products
-      const validProducts = products.filter(product => 
-        product.userId && 
-        product.productId && 
-        product.name && 
-        typeof product.price === 'number' && 
-        product.status
-      );
-      
-      if (validProducts.length !== products.length) {
-        console.warn('[ProductService] Filtered out', products.length - validProducts.length, 'invalid products');
-      }
-      
-      return validProducts;
+      return products;
     } catch (error) {
       console.error('[ProductService] Error getting user products:', error);
       return [];
@@ -368,17 +341,17 @@ export class ProductService {
       return { success: false, error: 'Not on client side' };
     }
     
+    if (!db) {
+      return { success: false, error: 'Firebase database not initialized' };
+    }
+    
     try {
-      console.log('[ProductService] Testing database connection...');
-      
       // Test if we can read from the collection
       const testQuery = query(collection(db, this.COLLECTION), limit(1));
       await getDocs(testQuery);
       
-      console.log('[ProductService] Database connection test successful');
       return { success: true };
     } catch (error) {
-      console.error('[ProductService] Database connection test failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -393,7 +366,9 @@ export class ProductService {
       return () => {};
     }
     
-    console.log('[ProductService] Setting up real-time listener for user:', userId);
+    if (!db) {
+      return () => {};
+    }
     
     const q = query(
       collection(db, this.COLLECTION), 
@@ -401,7 +376,6 @@ export class ProductService {
     );
     
     return onSnapshot(q, (querySnapshot) => {
-      console.log('[ProductService] Real-time update received:', querySnapshot.docs.length, 'documents');
       
       const products = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -414,17 +388,7 @@ export class ProductService {
       // Sort products by purchase date
       products.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
       
-      // Filter out invalid products
-      const validProducts = products.filter(product => 
-        product.userId && 
-        product.productId && 
-        product.name && 
-        typeof product.price === 'number' && 
-        product.status
-      );
-      
-      console.log('[ProductService] Valid products for real-time update:', validProducts.length);
-      callback(validProducts);
+      callback(products);
     });
   }
 
@@ -434,19 +398,12 @@ export class ProductService {
       console.warn('Firebase not initialized on server, cannot add purchased product');
       throw new Error('Firebase not initialized');
     }
+    
+    if (!db) {
+      throw new Error('Firebase database not initialized');
+    }
+    
     try {
-      console.log('[ProductService] Adding purchased product:', product);
-      console.log('[ProductService] Collection:', this.COLLECTION);
-      console.log('[ProductService] Firebase db object:', db);
-      console.log('[ProductService] Product data type check:', {
-        userId: typeof product.userId,
-        productId: typeof product.productId,
-        name: typeof product.name,
-        price: typeof product.price,
-        status: typeof product.status,
-        planType: typeof product.planType
-      });
-      
       // Validate that all required fields are present and have correct types
       if (!product.userId || typeof product.userId !== 'string') {
         throw new Error(`Invalid userId: ${product.userId}`);
@@ -467,31 +424,19 @@ export class ProductService {
         throw new Error(`Invalid planType: ${product.planType}`);
       }
       
-      console.log('[ProductService] All validations passed, attempting to save...');
-      
       // Filter out undefined values to prevent Firestore errors
       const cleanProductData = Object.fromEntries(
         Object.entries(product).filter(([_, value]) => value !== undefined)
       );
-      
-      console.log('[ProductService] Cleaned product data:', cleanProductData);
       
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...cleanProductData,
         createdAt: serverTimestamp()
       });
       
-      console.log('[ProductService] Product added successfully with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('[ProductService] Error adding purchased product:', error);
-      console.error('[ProductService] Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        product: product,
-        collection: this.COLLECTION,
-        firebaseInitialized: !!db
-      });
       throw error;
     }
   }
@@ -604,8 +549,7 @@ export class ProductService {
           
           // Process final payout if needed
           if (product.planType === 'Basic' || product.planType === 'Premium') {
-            // Note: completePlan is handled in InvestmentPlanService
-            console.log('Product completed:', product.id);
+                    // Note: completePlan is handled in InvestmentPlanService
           }
         }
       }
@@ -633,6 +577,83 @@ export class ProductService {
     } catch (error) {
       console.error('Error getting user active products:', error);
       return [];
+    }
+  }
+
+  // Claim returns for completed Basic and Premium plans
+  static async claimReturns(userId: string, productId: string): Promise<{ success: boolean; message: string }> {
+    if (!isClientSide()) {
+      return { success: false, message: 'Not on client side' };
+    }
+    
+    try {
+      // Get the product
+      const productDoc = await getDoc(doc(db, this.COLLECTION, productId));
+      if (!productDoc.exists()) {
+        return { success: false, message: 'Product not found' };
+      }
+      
+      const product = productDoc.data() as PurchasedProduct;
+      
+      // Verify the product belongs to the user
+      if (product.userId !== userId) {
+        return { success: false, message: 'Unauthorized access' };
+      }
+      
+      // Check if the cycle has ended
+      const now = new Date();
+      const endDate = new Date(product.endDate);
+      if (now < endDate) {
+        return { success: false, message: 'Cycle has not ended yet' };
+      }
+      
+      // Check if returns have already been claimed
+      if (product.status === 'Completed') {
+        return { success: false, message: 'Returns have already been claimed' };
+      }
+      
+      // Calculate the total returns
+      const totalReturns = product.totalEarning;
+      
+      // Update product status to completed
+      await updateDoc(doc(db, this.COLLECTION, productId), {
+        status: 'Completed',
+        lastPayoutDate: new Date().toISOString()
+      });
+      
+      // Add the returns to user's balance
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const newBalance = (userData.balance || 0) + totalReturns;
+        
+        await updateDoc(doc(db, 'users', userId), {
+          balance: newBalance
+        });
+      }
+      
+      // Create transaction record
+      await TransactionService.createTransaction({
+        userId: userId,
+        userEmail: '', // Will be filled by TransactionService
+        type: 'Investment',
+        amount: totalReturns,
+        status: 'Completed',
+        date: new Date().toISOString(),
+        description: `Returns claimed for ${product.name}`
+      });
+      
+      return { 
+        success: true, 
+        message: `Successfully claimed ₦${totalReturns.toLocaleString()} returns for ${product.name}!` 
+      };
+      
+    } catch (error) {
+      console.error('[ProductService] Failed to claim returns:', error);
+      return { 
+        success: false, 
+        message: 'Failed to claim returns. Please try again.' 
+      };
     }
   }
 }
