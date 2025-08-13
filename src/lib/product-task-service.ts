@@ -42,8 +42,12 @@ export class ProductTaskService {
     totalReturn: number,
     cycleDays: number
   ): Promise<ProductTask> {
+    console.log(`[TASK] Creating product task for:`, { userId, productId, productName, totalReturn, cycleDays });
+    
     const dailyReward = Math.floor(totalReturn / cycleDays);
     const taskId = `${userId}_${productId}`;
+    
+    console.log(`[TASK] Calculated daily reward: ${dailyReward}, Task ID: ${taskId}`);
     
     const task: ProductTask = {
       id: taskId,
@@ -68,12 +72,20 @@ export class ProductTaskService {
       lastActionTime: null
     };
 
+    console.log(`[TASK] Task object created:`, task);
+
     try {
+      console.log(`[TASK] Saving task to Firestore with ID: ${taskId}`);
       await setDoc(doc(db, this.collectionName, taskId), task);
-      console.log(`[TASK] Created product task for ${productName}`);
+      console.log(`[TASK] Task saved successfully to Firestore`);
+      
+      // Verify the task was saved by reading it back
+      const savedTask = await this.getProductTask(userId, productId);
+      console.log(`[TASK] Verification - task read back:`, savedTask ? 'Success' : 'Failed');
+      
       return task;
     } catch (error) {
-      console.error('[ERROR] Failed to create product task:', error);
+      console.error('[TASK] Failed to create product task:', error);
       throw error;
     }
   }
@@ -81,20 +93,30 @@ export class ProductTaskService {
   async getProductTask(userId: string, productId: string): Promise<ProductTask | null> {
     try {
       const taskId = `${userId}_${productId}`;
+      console.log(`[TASK] Getting product task with ID: ${taskId}`);
+      
       const taskDoc = await getDoc(doc(db, this.collectionName, taskId));
+      console.log(`[TASK] Task document exists: ${taskDoc.exists()}`);
       
       if (taskDoc.exists()) {
         const data = taskDoc.data();
-        return {
+        console.log(`[TASK] Task data retrieved:`, data);
+        
+        const task = {
           ...data,
           lastCompletedAt: data.lastCompletedAt ? new Date(data.lastCompletedAt.toDate()) : null,
           nextAvailableTime: data.nextAvailableTime ? new Date(data.nextAvailableTime.toDate()) : null,
           lastActionTime: data.lastActionTime ? new Date(data.lastActionTime.toDate()) : null
         } as ProductTask;
+        
+        console.log(`[TASK] Processed task object:`, task);
+        return task;
+      } else {
+        console.log(`[TASK] No task document found for ID: ${taskId}`);
+        return null;
       }
-      return null;
     } catch (error) {
-      console.error('[ERROR] Failed to get product task:', error);
+      console.error('[TASK] Failed to get product task:', error);
       return null;
     }
   }

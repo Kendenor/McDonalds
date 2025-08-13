@@ -194,25 +194,34 @@ export default function MyProductsPage() {
   const loadProductTasks = async (products: PurchasedProduct[]) => {
     if (!user) return;
     
+    console.log('[PRODUCTS] Loading tasks for products:', products.map(p => ({ id: p.id, planType: p.planType, name: p.name })));
+    
     const tasksMap = new Map<string, ProductTask>();
     const statusesMap = new Map<string, TaskStatus>();
     const productTaskService = new ProductTaskService();
     
     for (const product of products) {
       try {
+        console.log(`[PRODUCTS] Loading task for product: ${product.id} (${product.planType})`);
         const task = await productTaskService.getProductTask(user.uid, product.id);
+        console.log(`[PRODUCTS] Task result for ${product.id}:`, task ? 'Found' : 'Not found');
+        
         if (task) {
           tasksMap.set(product.id, task);
           
           // Get task status
           const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
           statusesMap.set(product.id, status);
+          console.log(`[PRODUCTS] Task status for ${product.id}:`, status);
+        } else {
+          console.log(`[PRODUCTS] No task found for product ${product.id} (${product.planType})`);
         }
       } catch (error) {
-        console.error(`Failed to load task for product ${product.id}:`, error);
+        console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
       }
     }
     
+    console.log('[PRODUCTS] Final tasks map:', Array.from(tasksMap.keys()));
     setProductTasks(tasksMap);
     setTaskStatuses(statusesMap);
     updateCountdowns();
