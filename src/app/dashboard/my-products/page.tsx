@@ -224,6 +224,20 @@ export default function MyProductsPage() {
     return () => clearInterval(interval);
   }, [user, purchasedProducts, productTasks]);
 
+  // Real-time countdown timer - update every minute
+  useEffect(() => {
+    if (productTasks.size === 0) return;
+    
+    const interval = setInterval(() => {
+      updateCountdowns();
+    }, 60000); // Update every minute
+    
+    // Initial update
+    updateCountdowns();
+    
+    return () => clearInterval(interval);
+  }, [productTasks]);
+
   useEffect(() => {
     // Update countdowns every minute
     const interval = setInterval(updateCountdowns, 60000);
@@ -447,7 +461,21 @@ export default function MyProductsPage() {
     const countdownsMap = new Map<string, { hours: number; minutes: number }>();
     
     productTasks.forEach((task, productId) => {
-      if (task.nextAvailableTime) {
+      // Check if task is locked (completed actions = 5 and has lastCompletedAt)
+      if (task.completedActions === 5 && task.lastCompletedAt) {
+        const now = new Date();
+        const lastCompletion = new Date(task.lastCompletedAt);
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        
+        if (hoursRemaining > 0) {
+          const hours = Math.floor(hoursRemaining);
+          const minutes = Math.floor((hoursRemaining - hours) * 60);
+          countdownsMap.set(productId, { hours, minutes });
+        }
+      }
+      // Also check nextAvailableTime for legacy support
+      else if (task.nextAvailableTime) {
         const now = new Date();
         const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
         
@@ -725,6 +753,14 @@ export default function MyProductsPage() {
                                 <span>{task.completedActions}/{task.requiredActions} Actions</span>
                               </div>
                               <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
+                              
+                              {/* Lock Status Indicator */}
+                              {countdown && countdown.hours > 0 && (
+                                <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
+                                  <Lock className="h-3 w-3" />
+                                  <span>Task locked for next 24 hours</span>
+                                </div>
+                              )}
                             </div>
 
                             {/* Action Buttons */}
@@ -732,6 +768,7 @@ export default function MyProductsPage() {
                               {task.actionTypes.map((actionType, index) => {
                                 const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
                                 const isCompleted = isActionCompleted(product.id, actionType);
+                                const isTaskLocked = countdown && countdown.hours > 0; // Task is locked if countdown exists
                                 
                                 return (
                                   <Button
@@ -739,11 +776,11 @@ export default function MyProductsPage() {
                                     variant={getActionButtonVariant(product.id, actionType)}
                                     size="sm"
                                     onClick={() => handleCompleteAction(product.id, actionType)}
-                                    disabled={isCompleted}
-                                    className="h-10 text-xs"
+                                    disabled={isCompleted || isTaskLocked}
+                                    className={`h-10 text-xs ${isTaskLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
                                     {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                    {getActionButtonText(product.id, actionType)}
+                                    {isTaskLocked ? 'Locked' : getActionButtonText(product.id, actionType)}
                                   </Button>
                                 );
                               })}
@@ -763,9 +800,22 @@ export default function MyProductsPage() {
                               ) : (
                                 <div className="text-center">
                                   {countdown ? (
-                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                      <Clock className="h-4 w-4" />
-                                      <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="font-medium">Task Locked</span>
+                                      </div>
+                                      <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
+                                        <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                          {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}
+                                        </div>
+                                        <div className="text-xs text-orange-500 dark:text-orange-300">
+                                          Hours : Minutes remaining
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        Complete 5 actions again after countdown expires
+                                      </p>
                                     </div>
                                   ) : (
                                     <p className="text-sm text-muted-foreground">{status?.message}</p>
