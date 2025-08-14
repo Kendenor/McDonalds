@@ -116,6 +116,15 @@ export default function MyProductsPage() {
       if (products.length > 0) {
         console.log('[PRODUCTS] Loading tasks for', products.length, 'products');
         loadProductTasks(products);
+        
+        // Additional check: if any Special plans don't have tasks, try to create them
+        const specialPlans = products.filter(p => p.planType === 'Special');
+        if (specialPlans.length > 0) {
+          console.log('[PRODUCTS] Found Special plans, ensuring tasks exist...');
+          setTimeout(() => {
+            loadProductTasks(products); // Retry after a short delay
+          }, 1000);
+        }
       } else {
         console.log('[PRODUCTS] No products, clearing tasks');
         setProductTasks(new Map());
@@ -139,6 +148,25 @@ export default function MyProductsPage() {
       return () => clearTimeout(timeout);
     }
   }, [loading]);
+
+  // Auto-check for missing tasks every 5 seconds for Special plans
+  useEffect(() => {
+    if (!user || purchasedProducts.length === 0) return;
+    
+    const interval = setInterval(() => {
+      const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
+      if (specialPlans.length > 0) {
+        // Check if any Special plans are missing tasks
+        const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
+        if (missingTasks.length > 0) {
+          console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
+          loadProductTasks(missingTasks);
+        }
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [user, purchasedProducts, productTasks]);
 
   useEffect(() => {
     // Update countdowns every minute
@@ -196,55 +224,84 @@ export default function MyProductsPage() {
     const statusesMap = new Map<string, TaskStatus>();
     const productTaskService = new ProductTaskService();
     
-                      for (const product of products) {
-                    try {
-                      console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
-                      console.log(`[PRODUCTS] Product details:`, {
-                        id: product.id,
-                        name: product.name,
-                        planType: product.planType,
-                        status: product.status
-                      });
+    for (const product of products) {
+      try {
+        console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
+        console.log(`[PRODUCTS] Product details:`, {
+          id: product.id,
+          name: product.name,
+          planType: product.planType,
+          status: product.status
+        });
 
-                      const task = await productTaskService.getProductTask(user.uid, product.id);
-
-                      if (task) {
-                        console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
-                        tasksMap.set(product.id, task);
-
-                        // Get task status
-                        const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                        statusesMap.set(product.id, status);
-                        console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
-                      } else {
-                        console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
-                        
-                        // For Special plans, try to create the task if it doesn't exist
-                        if (product.planType === 'Special') {
-                          console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
-                          try {
-                            const newTask = await productTaskService.createProductTask(
-                              user.uid,
-                              product.id,
-                              product.name,
-                              product.totalEarning,
-                              product.cycleDays
-                            );
-                            console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
-                            tasksMap.set(product.id, newTask);
-                            
-                            // Get task status for new task
-                            const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                            statusesMap.set(product.id, status);
-                          } catch (createError) {
-                            console.error(`[PRODUCTS] Failed to create missing task for ${product.name}:`, createError);
-                          }
-                        }
-                      }
-                    } catch (error) {
-                      console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
-                    }
+        let task = await productTaskService.getProductTask(user.uid, product.id);
+        
+        if (task) {
+          console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
+          tasksMap.set(product.id, task);
+          
+          // Get task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+          statusesMap.set(product.id, status);
+          console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
+        } else {
+          console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
+          
+          // For Special plans, try to create the task if it doesn't exist
+          if (product.planType === 'Special') {
+            console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
+            try {
+              const newTask = await productTaskService.createProductTask(
+                user.uid,
+                product.id,
+                product.name,
+                product.totalEarning,
+                product.cycleDays
+              );
+              console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
+              
+              if (newTask) {
+                tasksMap.set(product.id, newTask);
+                
+                // Get task status for new task
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                statusesMap.set(product.id, status);
+                
+                console.log(`[PRODUCTS] Task created and status loaded for ${product.name}:`, status);
+              } else {
+                console.error(`[PRODUCTS] Task creation returned null for ${product.name}`);
+              }
+            } catch (createError) {
+              console.error(`[PRODUCTS] Failed to create missing task for ${product.name}:`, createError);
+              
+              // Try to create task again after a short delay
+              setTimeout(async () => {
+                try {
+                  console.log(`[PRODUCTS] Retrying task creation for ${product.name} after error...`);
+                  const retryTask = await productTaskService.createProductTask(
+                    user.uid,
+                    product.id,
+                    product.name,
+                    product.totalEarning,
+                    product.cycleDays
+                  );
+                  if (retryTask) {
+                    console.log(`[PRODUCTS] Retry successful for ${product.name}:`, retryTask);
+                    setProductTasks(prev => new Map(prev.set(product.id, retryTask)));
+                    const retryStatus = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                    setTaskStatuses(prev => new Map(prev.set(product.id, retryStatus)));
                   }
+                } catch (retryError) {
+                  console.error(`[PRODUCTS] Retry failed for ${product.name}:`, retryError);
+                }
+              }, 2000);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
+      }
+    }
     
     console.log('[PRODUCTS] Final tasks map:', tasksMap.size, 'tasks loaded');
     console.log('[PRODUCTS] Final statuses map:', statusesMap.size, 'statuses loaded');
@@ -265,12 +322,15 @@ export default function MyProductsPage() {
     } else {
       console.warn('[PRODUCTS] No tasks were loaded for any products');
       
-      // Retry once after a delay if no tasks were found (in case task creation is delayed)
-      if (retryCount === 0) {
-        console.log('[PRODUCTS] No tasks found, retrying after 3 seconds...');
+      // Retry multiple times with increasing delays for Special plans
+      if (retryCount < 3) {
+        const delay = (retryCount + 1) * 2000; // 2s, 4s, 6s
+        console.log(`[PRODUCTS] No tasks found, retrying after ${delay/1000} seconds... (attempt ${retryCount + 1}/3)`);
         setTimeout(() => {
-          loadProductTasks(products, 1);
-        }, 3000);
+          loadProductTasks(products, retryCount + 1);
+        }, delay);
+      } else {
+        console.error('[PRODUCTS] Failed to load tasks after 3 attempts');
       }
     }
   };
@@ -308,11 +368,11 @@ export default function MyProductsPage() {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-            
-            // Update task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+          
+          // Update task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
             // Show user-facing toast instead of console
             alert('Action completed!');
@@ -346,11 +406,11 @@ export default function MyProductsPage() {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-            
-            // Update task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+          
+          // Update task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
             // Inform user about reward
             alert(`Daily task completed! Reward added to your balance.`);
@@ -461,6 +521,21 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
+          <Button 
+            onClick={() => {
+              console.log('[DEBUG] Manual task creation triggered');
+              const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
+              if (specialPlans.length > 0) {
+                console.log('[DEBUG] Found Special plans:', specialPlans);
+                loadProductTasks(specialPlans);
+              }
+            }}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            Debug: Create Tasks
+          </Button>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards
@@ -546,78 +621,78 @@ export default function MyProductsPage() {
                           )}
                         </div>
                         
-                                                {/* Special Plans: Always show tasks with 24-hour countdown */}
+                        {/* Special Plans: Always show tasks with 24-hour countdown */}
                         {product.planType === 'Special' ? (
                           task ? (
-                            <>
-                              {/* Task Progress */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span>Task Progress</span>
-                                  <span>{task.completedActions}/{task.requiredActions} Actions</span>
-                                </div>
-                                <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
+                          <>
+                            {/* Task Progress */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between text-sm">
+                                <span>Task Progress</span>
+                                <span>{task.completedActions}/{task.requiredActions} Actions</span>
                               </div>
+                              <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
+                            </div>
 
-                              {/* Action Buttons */}
-                              <div className="grid grid-cols-2 gap-2">
-                                {task.actionTypes.map((actionType, index) => {
-                                  const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
-                                  const isCompleted = isActionCompleted(product.id, actionType);
-                                  
-                                  return (
-                                    <Button
-                                      key={actionType}
-                                      variant={getActionButtonVariant(product.id, actionType)}
-                                      size="sm"
-                                      onClick={() => handleCompleteAction(product.id, actionType)}
-                                      disabled={isCompleted}
-                                      className="h-10 text-xs"
-                                    >
-                                      {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                      {getActionButtonText(product.id, actionType)}
-                                    </Button>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Task Completion */}
-                              <div className="pt-3 border-t">
-                                {status?.canComplete ? (
-                                  <Button 
-                                    onClick={() => handleCompleteTask(product.id)}
-                                    className="w-full"
+                            {/* Action Buttons */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {task.actionTypes.map((actionType, index) => {
+                                const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
+                                const isCompleted = isActionCompleted(product.id, actionType);
+                                
+                                return (
+                                  <Button
+                                    key={actionType}
+                                    variant={getActionButtonVariant(product.id, actionType)}
                                     size="sm"
+                                    onClick={() => handleCompleteAction(product.id, actionType)}
+                                    disabled={isCompleted}
+                                    className="h-10 text-xs"
                                   >
-                                    <Trophy className="h-4 w-4 mr-2" />
-                                    Complete Daily Task (₦{task.dailyReward.toLocaleString()})
+                                    {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
+                                    {getActionButtonText(product.id, actionType)}
                                   </Button>
-                                ) : (
-                                  <div className="text-center">
-                                    {countdown ? (
-                                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                        <Clock className="h-4 w-4" />
-                                        <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
-                                      </div>
-                                    ) : (
-                                      <p className="text-sm text-muted-foreground">{status?.message}</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+                                );
+                              })}
+                            </div>
 
-                              {/* Task Stats */}
-                              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                            {/* Task Completion */}
+                            <div className="pt-3 border-t">
+                              {status?.canComplete ? (
+                                <Button 
+                                  onClick={() => handleCompleteTask(product.id)}
+                                  className="w-full"
+                                  size="sm"
+                                >
+                                  <Trophy className="h-4 w-4 mr-2" />
+                                  Complete Daily Task (₦{task.dailyReward.toLocaleString()})
+                                </Button>
+                              ) : (
                                 <div className="text-center">
-                                  <p className="text-xs text-muted-foreground">Earned Today</p>
-                                  <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
+                                  {countdown ? (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                      <Clock className="h-4 w-4" />
+                                      <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                  )}
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-muted-foreground">Expected Total</p>
-                                  <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
-                                </div>
+                              )}
+                            </div>
+
+                            {/* Task Stats */}
+                            <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground">Earned Today</p>
+                                <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
                               </div>
-                            </>
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground">Expected Total</p>
+                                <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          </>
                           ) : (
                             // Special plan but no task - show loading or error state
                             <div className="text-center p-4 border rounded-lg">
