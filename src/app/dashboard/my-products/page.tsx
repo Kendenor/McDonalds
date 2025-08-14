@@ -459,6 +459,16 @@ export default function MyProductsPage() {
               const status = taskStatuses.get(product.id);
               const countdown = countdowns.get(product.id);
               
+              // Debug logging for Special plans
+              if (product.planType === 'Special') {
+                console.log(`[PRODUCTS] Special plan ${product.name}:`, {
+                  productId: product.id,
+                  hasTask: !!task,
+                  task: task,
+                  status: status
+                });
+              }
+              
               return (
                 <Card key={product.id} className="overflow-hidden">
                   <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5">
@@ -507,78 +517,102 @@ export default function MyProductsPage() {
                           )}
                         </div>
                         
-                        {/* Special Plans: Always show tasks with 24-hour countdown */}
-                        {product.planType === 'Special' && task ? (
-                          <>
-                            {/* Task Progress */}
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between text-sm">
-                                <span>Task Progress</span>
-                                <span>{task.completedActions}/{task.requiredActions} Actions</span>
-                              </div>
-                              <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="grid grid-cols-2 gap-2">
-                              {task.actionTypes.map((actionType, index) => {
-                                const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
-                                const isCompleted = isActionCompleted(product.id, actionType);
-                                
-                                return (
-                                  <Button
-                                    key={actionType}
-                                    variant={getActionButtonVariant(product.id, actionType)}
-                                    size="sm"
-                                    onClick={() => handleCompleteAction(product.id, actionType)}
-                                    disabled={isCompleted}
-                                    className="h-10 text-xs"
-                                  >
-                                    {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                    {getActionButtonText(product.id, actionType)}
-                                  </Button>
-                                );
-                              })}
-                            </div>
-
-                            {/* Task Completion */}
-                            <div className="pt-3 border-t">
-                              {status?.canComplete ? (
-                                <Button 
-                                  onClick={() => handleCompleteTask(product.id)}
-                                  className="w-full"
-                                  size="sm"
-                                >
-                                  <Trophy className="h-4 w-4 mr-2" />
-                                  Complete Daily Task (₦{task.dailyReward.toLocaleString()})
-                                </Button>
-                              ) : (
-                                <div className="text-center">
-                                  {countdown ? (
-                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                      <Clock className="h-4 w-4" />
-                                      <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
-                                  )}
+                                                {/* Special Plans: Always show tasks with 24-hour countdown */}
+                        {product.planType === 'Special' ? (
+                          task ? (
+                            <>
+                              {/* Task Progress */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span>Task Progress</span>
+                                  <span>{task.completedActions}/{task.requiredActions} Actions</span>
                                 </div>
-                              )}
-                            </div>
+                                <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
+                              </div>
 
-                            {/* Task Stats */}
-                            <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                              <div className="text-center">
-                                <p className="text-xs text-muted-foreground">Earned Today</p>
-                                <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
+                              {/* Action Buttons */}
+                              <div className="grid grid-cols-2 gap-2">
+                                {task.actionTypes.map((actionType, index) => {
+                                  const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
+                                  const isCompleted = isActionCompleted(product.id, actionType);
+                                  
+                                  return (
+                                    <Button
+                                      key={actionType}
+                                      variant={getActionButtonVariant(product.id, actionType)}
+                                      size="sm"
+                                      onClick={() => handleCompleteAction(product.id, actionType)}
+                                      disabled={isCompleted}
+                                      className="h-10 text-xs"
+                                    >
+                                      {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
+                                      {getActionButtonText(product.id, actionType)}
+                                    </Button>
+                                  );
+                                })}
                               </div>
-                              <div className="text-center">
-                                <p className="text-xs text-muted-foreground">Expected Total</p>
-                                <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
+
+                              {/* Task Completion */}
+                              <div className="pt-3 border-t">
+                                {status?.canComplete ? (
+                                  <Button 
+                                    onClick={() => handleCompleteTask(product.id)}
+                                    className="w-full"
+                                    size="sm"
+                                  >
+                                    <Trophy className="h-4 w-4 mr-2" />
+                                    Complete Daily Task (₦{task.dailyReward.toLocaleString()})
+                                  </Button>
+                                ) : (
+                                  <div className="text-center">
+                                    {countdown ? (
+                                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <Clock className="h-4 w-4" />
+                                        <span>Locked for {countdown.hours}h {countdown.minutes}m</span>
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
+
+                              {/* Task Stats */}
+                              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                                <div className="text-center">
+                                  <p className="text-xs text-muted-foreground">Earned Today</p>
+                                  <p className="text-sm font-medium">₦{task.totalEarned.toLocaleString()}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-muted-foreground">Expected Total</p>
+                                  <p className="text-sm font-medium">₦{task.totalExpected.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            // Special plan but no task - show loading or error state
+                            <div className="text-center p-4 border rounded-lg">
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                <span className="font-medium">Loading Task...</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-3">
+                                Setting up your daily task system. This may take a moment.
+                              </p>
+                              <Button 
+                                onClick={() => {
+                                  console.log('[PRODUCTS] Manually refreshing task for Special plan:', product.id);
+                                  loadProductTasks([product]);
+                                }}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Refresh Task
+                              </Button>
                             </div>
-                          </>
-                        ) : (product.planType === 'Basic' || product.planType === 'Premium') ? (
+                          )
+                        ) : product.planType === 'Basic' || product.planType === 'Premium' ? (
                           // Basic and Premium plans: Show claim button when cycle ends
                           isCycleEnded(product) ? (
                             <>
