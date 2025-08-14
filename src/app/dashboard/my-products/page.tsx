@@ -11,7 +11,7 @@ import { UserService, ProductService } from '@/lib/user-service';
 import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock, RefreshCw } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
 
 interface PurchasedProduct {
   id: string;
@@ -461,27 +461,6 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
-          <Button 
-            onClick={() => {
-              console.log('[PRODUCTS] Manual refresh triggered');
-              loadPurchasedProducts();
-            }} 
-            disabled={loading || loadingTasks}
-            variant="outline"
-            size="sm"
-          >
-            {loading || loadingTasks ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </>
-            )}
-          </Button>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards
@@ -655,18 +634,6 @@ export default function MyProductsPage() {
                                 <li>• Task was not created during purchase</li>
                               </ul>
                               <div className="space-y-2">
-                                <Button 
-                                  onClick={() => {
-                                    console.log('[PRODUCTS] Manually refreshing task for Special plan:', product.id);
-                                    loadProductTasks([product]);
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full"
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-2" />
-                                  Refresh Task
-                                </Button>
                                 <Button 
                                   onClick={() => {
                                     console.log('[PRODUCTS] Going back to dashboard to re-purchase');
