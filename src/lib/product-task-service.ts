@@ -59,6 +59,13 @@ export class ProductTaskService {
     const dailyReward = Math.floor(totalReturn / cycleDays);
     const taskId = `${userId}_${productId}`;
     
+    // IMPORTANT: Check if task already exists to prevent recreation
+    const existingTask = await this.getProductTask(userId, productId);
+    if (existingTask) {
+      console.log(`[TASK] Task already exists for ${productName}, returning existing task:`, existingTask);
+      return existingTask;
+    }
+    
     console.log(`[TASK] Calculated daily reward: ${dailyReward}, Task ID: ${taskId}`);
     
     const task: ProductTask = {
@@ -145,7 +152,15 @@ export class ProductTaskService {
             (data.lastActionTime.toDate ? data.lastActionTime.toDate() : new Date(data.lastActionTime)) : null
         } as ProductTask;
         
+        console.log(`[TASK] Raw data from Firestore:`, data);
         console.log(`[TASK] Processed task object:`, task);
+        console.log(`[TASK] Key fields:`, {
+          totalEarned: task.totalEarned,
+          cycleDaysCompleted: task.cycleDaysCompleted,
+          completedActions: task.completedActions,
+          lastCompletedAt: task.lastCompletedAt,
+          isExpired: task.isExpired
+        });
         return task;
       } else {
         console.log(`[TASK] No task document found for ID: ${taskId}`);
@@ -302,6 +317,15 @@ export class ProductTaskService {
         seconds: Math.floor(now.getTime() / 1000),
         nanoseconds: (now.getTime() % 1000) * 1000000
       };
+
+      console.log(`[TASK] Updating task with:`, {
+        currentTotalEarned: task.totalEarned,
+        dailyReward: task.dailyReward,
+        newTotalEarned,
+        newCycleDaysCompleted,
+        isExpired,
+        lastCompletedAt: firestoreTimestamp
+      });
 
       await updateDoc(doc(db, this.collectionName, task.id), {
         totalEarned: newTotalEarned,

@@ -124,33 +124,51 @@ export default function MyProductsPage() {
           
           // Immediate task creation for Special plans
           specialPlans.forEach(async (product) => {
-            if (!productTasks.has(product.id)) {
-              console.log(`[PRODUCTS] Creating task immediately for ${product.name}`);
-              try {
-                const productTaskService = new ProductTaskService();
-                const newTask = await productTaskService.createProductTask(
-                  user.uid,
-                  product.id,
-                  product.name,
-                  product.totalEarning,
-                  product.cycleDays
-                );
+            // Check if task exists in database, not just in local state
+            try {
+              const productTaskService = new ProductTaskService();
+              const existingTask = await productTaskService.getProductTask(user.uid, product.id);
+              
+              if (existingTask) {
+                console.log(`[PRODUCTS] Task already exists in database for ${product.name}:`, existingTask);
                 
-                if (newTask) {
-                  console.log(`[PRODUCTS] Task created immediately for ${product.name}:`, newTask);
+                // Update UI with existing task
+                setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
+                
+                // Get and set task status
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                
+                console.log(`[PRODUCTS] Existing task status set for ${product.name}:`, status);
+              } else if (!productTasks.has(product.id)) {
+                console.log(`[PRODUCTS] Creating new task for ${product.name}`);
+                try {
+                  const newTask = await productTaskService.createProductTask(
+                    user.uid,
+                    product.id,
+                    product.name,
+                    product.totalEarning,
+                    product.cycleDays
+                  );
                   
-                  // Update UI immediately
-                  setProductTasks(prev => new Map(prev.set(product.id, newTask)));
-                  
-                  // Get and set task status
-                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                  setTaskStatuses(prev => new Map(prev.set(product.id, status)));
-                  
-                  console.log(`[PRODUCTS] Task status set for ${product.name}:`, status);
+                  if (newTask) {
+                    console.log(`[PRODUCTS] Task created immediately for ${product.name}:`, newTask);
+                    
+                    // Update UI immediately
+                    setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                    
+                    // Get and set task status
+                    const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                    setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                    
+                    console.log(`[PRODUCTS] Task status set for ${product.name}:`, status);
+                  }
+                } catch (error) {
+                  console.error(`[PRODUCTS] Failed to create task immediately for ${product.name}:`, error);
                 }
-              } catch (error) {
-                console.error(`[PRODUCTS] Failed to create task immediately for ${product.name}:`, error);
               }
+            } catch (error) {
+              console.error(`[PRODUCTS] Failed to check existing task for ${product.name}:`, error);
             }
           });
         }
@@ -190,31 +208,53 @@ export default function MyProductsPage() {
         if (missingTasks.length > 0) {
           console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
           
-          // Create missing tasks immediately
+          // Check for missing tasks in database, not just local state
           missingTasks.forEach(async (product) => {
-            console.log(`[PRODUCTS] Auto-creating missing task for ${product.name}`);
+            console.log(`[PRODUCTS] Auto-checking for missing task for ${product.name}`);
             try {
               const productTaskService = new ProductTaskService();
-              const newTask = await productTaskService.createProductTask(
-                user.uid,
-                product.id,
-                product.name,
-                product.totalEarning,
-                product.cycleDays
-              );
+              const existingTask = await productTaskService.getProductTask(user.uid, product.id);
               
-              if (newTask) {
-                console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
+              if (existingTask) {
+                console.log(`[PRODUCTS] Auto-check found existing task for ${product.name}:`, existingTask);
                 
-                // Update UI immediately
-                setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                // Update UI with existing task
+                setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
                 
                 // Get and set task status
                 const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
                 setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                
+                console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
+              } else {
+                console.log(`[PRODUCTS] Auto-check: No existing task found, creating new one for ${product.name}`);
+                try {
+                  const newTask = await productTaskService.createProductTask(
+                    user.uid,
+                    product.id,
+                    product.name,
+                    product.totalEarning,
+                    product.cycleDays
+                  );
+                  
+                  if (newTask) {
+                    console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
+                    
+                    // Update UI immediately
+                    setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                    
+                    // Get and set task status
+                    const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                    setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                    
+                    console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
+                  }
+                } catch (error) {
+                  console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
+                }
               }
             } catch (error) {
-              console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
+              console.error(`[PRODUCTS] Failed to auto-check task for ${product.name}:`, error);
             }
           });
         }
@@ -273,34 +313,53 @@ export default function MyProductsPage() {
         // Additional immediate task creation for Special plans
         const specialPlans = products.filter(p => p.planType === 'Special');
         if (specialPlans.length > 0) {
-          console.log('[PRODUCTS] Initial load: Creating tasks for Special plans immediately...');
+          console.log('[PRODUCTS] Initial load: Checking for Special plan tasks...');
           
           for (const product of specialPlans) {
-            if (!productTasks.has(product.id)) {
-              console.log(`[PRODUCTS] Creating task for ${product.name} during initial load`);
-              try {
-                const productTaskService = new ProductTaskService();
-                const newTask = await productTaskService.createProductTask(
-                  user.uid,
-                  product.id,
-                  product.name,
-                  product.totalEarning,
-                  product.cycleDays
-                );
+            try {
+              const productTaskService = new ProductTaskService();
+              const existingTask = await productTaskService.getProductTask(user.uid, product.id);
+              
+              if (existingTask) {
+                console.log(`[PRODUCTS] Found existing task during initial load for ${product.name}:`, existingTask);
                 
-                if (newTask) {
-                  console.log(`[PRODUCTS] Task created during initial load for ${product.name}`);
+                // Update UI with existing task
+                setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
+                
+                // Get and set task status
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                
+                console.log(`[PRODUCTS] Existing task status set during initial load for ${product.name}:`, status);
+              } else if (!productTasks.has(product.id)) {
+                console.log(`[PRODUCTS] Creating new task during initial load for ${product.name}`);
+                try {
+                  const newTask = await productTaskService.createProductTask(
+                    user.uid,
+                    product.id,
+                    product.name,
+                    product.totalEarning,
+                    product.cycleDays
+                  );
                   
-                  // Update UI immediately
-                  setProductTasks(prev => new Map(prev.set(product.id, newTask)));
-                  
-                  // Get and set task status
-                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                  setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                  if (newTask) {
+                    console.log(`[PRODUCTS] Task created during initial load for ${product.name}`);
+                    
+                    // Update UI immediately
+                    setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                    
+                    // Get and set task status
+                    const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                    setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                    
+                    console.log(`[PRODUCTS] New task status set during initial load for ${product.name}:`, status);
+                  }
+                } catch (error) {
+                  console.error(`[PRODUCTS] Failed to create task during initial load for ${product.name}:`, error);
                 }
-              } catch (error) {
-                console.error(`[PRODUCTS] Failed to create task during initial load for ${product.name}:`, error);
               }
+            } catch (error) {
+              console.error(`[PRODUCTS] Failed to check existing task during initial load for ${product.name}:`, error);
             }
           }
         }
