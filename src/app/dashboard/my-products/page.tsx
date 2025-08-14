@@ -117,13 +117,42 @@ export default function MyProductsPage() {
         console.log('[PRODUCTS] Loading tasks for', products.length, 'products');
         loadProductTasks(products);
         
-        // Additional check: if any Special plans don't have tasks, try to create them
+        // For Special plans, ensure tasks are created immediately
         const specialPlans = products.filter(p => p.planType === 'Special');
         if (specialPlans.length > 0) {
-          console.log('[PRODUCTS] Found Special plans, ensuring tasks exist...');
-          setTimeout(() => {
-            loadProductTasks(products); // Retry after a short delay
-          }, 1000);
+          console.log('[PRODUCTS] Found Special plans, ensuring tasks exist immediately...');
+          
+          // Immediate task creation for Special plans
+          specialPlans.forEach(async (product) => {
+            if (!productTasks.has(product.id)) {
+              console.log(`[PRODUCTS] Creating task immediately for ${product.name}`);
+              try {
+                const productTaskService = new ProductTaskService();
+                const newTask = await productTaskService.createProductTask(
+                  user.uid,
+                  product.id,
+                  product.name,
+                  product.totalEarning,
+                  product.cycleDays
+                );
+                
+                if (newTask) {
+                  console.log(`[PRODUCTS] Task created immediately for ${product.name}:`, newTask);
+                  
+                  // Update UI immediately
+                  setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                  
+                  // Get and set task status
+                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                  setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                  
+                  console.log(`[PRODUCTS] Task status set for ${product.name}:`, status);
+                }
+              } catch (error) {
+                console.error(`[PRODUCTS] Failed to create task immediately for ${product.name}:`, error);
+              }
+            }
+          });
         }
       } else {
         console.log('[PRODUCTS] No products, clearing tasks');
@@ -135,7 +164,7 @@ export default function MyProductsPage() {
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, productTasks]);
 
   // Fallback: automatically stop loading after 15 seconds to prevent infinite loading
   useEffect(() => {
@@ -149,7 +178,7 @@ export default function MyProductsPage() {
     }
   }, [loading]);
 
-  // Auto-check for missing tasks every 5 seconds for Special plans
+  // Auto-check for missing tasks every 3 seconds for Special plans
   useEffect(() => {
     if (!user || purchasedProducts.length === 0) return;
     
@@ -160,10 +189,37 @@ export default function MyProductsPage() {
         const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
         if (missingTasks.length > 0) {
           console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
-          loadProductTasks(missingTasks);
+          
+          // Create missing tasks immediately
+          missingTasks.forEach(async (product) => {
+            console.log(`[PRODUCTS] Auto-creating missing task for ${product.name}`);
+            try {
+              const productTaskService = new ProductTaskService();
+              const newTask = await productTaskService.createProductTask(
+                user.uid,
+                product.id,
+                product.name,
+                product.totalEarning,
+                product.cycleDays
+              );
+              
+              if (newTask) {
+                console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
+                
+                // Update UI immediately
+                setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                
+                // Get and set task status
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+              }
+            } catch (error) {
+              console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
+            }
+          });
         }
       }
-    }, 5000);
+    }, 3000);
     
     return () => clearInterval(interval);
   }, [user, purchasedProducts, productTasks]);
@@ -199,6 +255,41 @@ export default function MyProductsPage() {
       
       try {
         await loadProductTasks(products);
+        
+        // Additional immediate task creation for Special plans
+        const specialPlans = products.filter(p => p.planType === 'Special');
+        if (specialPlans.length > 0) {
+          console.log('[PRODUCTS] Initial load: Creating tasks for Special plans immediately...');
+          
+          for (const product of specialPlans) {
+            if (!productTasks.has(product.id)) {
+              console.log(`[PRODUCTS] Creating task for ${product.name} during initial load`);
+              try {
+                const productTaskService = new ProductTaskService();
+                const newTask = await productTaskService.createProductTask(
+                  user.uid,
+                  product.id,
+                  product.name,
+                  product.totalEarning,
+                  product.cycleDays
+                );
+                
+                if (newTask) {
+                  console.log(`[PRODUCTS] Task created during initial load for ${product.name}`);
+                  
+                  // Update UI immediately
+                  setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                  
+                  // Get and set task status
+                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                  setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                }
+              } catch (error) {
+                console.error(`[PRODUCTS] Failed to create task during initial load for ${product.name}:`, error);
+              }
+            }
+          }
+        }
       } catch (taskError) {
         console.error('[PRODUCTS] Error loading tasks:', taskError);
       } finally {
@@ -538,41 +629,6 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => {
-                console.log('[DEBUG] Manual task creation triggered');
-                const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
-                if (specialPlans.length > 0) {
-                  console.log('[DEBUG] Found Special plans:', specialPlans);
-                  loadProductTasks(specialPlans);
-                }
-              }}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
-              Debug: Create Tasks
-            </Button>
-            <Button 
-              onClick={() => {
-                console.log('[DEBUG] Testing Firebase connection...');
-                import('@/lib/firebase').then(({ db }) => {
-                  console.log('[DEBUG] Firebase db object:', db);
-                  if (db) {
-                    console.log('[DEBUG] Database is initialized');
-                  } else {
-                    console.error('[DEBUG] Database is NOT initialized!');
-                  }
-                });
-              }}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
-              Test Firebase
-            </Button>
-          </div>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards
