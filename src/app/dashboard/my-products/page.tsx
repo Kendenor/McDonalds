@@ -11,7 +11,7 @@ import { UserService, ProductService } from '@/lib/user-service';
 import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock, RefreshCw } from 'lucide-react';
 
 interface PurchasedProduct {
   id: string;
@@ -107,12 +107,19 @@ export default function MyProductsPage() {
     if (!user) return;
 
     const unsubscribe = ProductService.onProductsChange(user.uid, (products) => {
+      console.log('[PRODUCTS] Real-time update received:', products.length, 'products');
+      
       // Update products with real-time data
       setPurchasedProducts(products);
       
-      // Load tasks for new products
+      // Always load tasks when products change
       if (products.length > 0) {
+        console.log('[PRODUCTS] Loading tasks for', products.length, 'products');
         loadProductTasks(products);
+      } else {
+        console.log('[PRODUCTS] No products, clearing tasks');
+        setProductTasks(new Map());
+        setTaskStatuses(new Map());
       }
     });
 
@@ -180,8 +187,10 @@ export default function MyProductsPage() {
     }
   };
 
-  const loadProductTasks = async (products: PurchasedProduct[]) => {
+  const loadProductTasks = async (products: PurchasedProduct[], retryCount = 0) => {
     if (!user) return;
+    
+    console.log('[PRODUCTS] Loading tasks for', products.length, 'products (attempt', retryCount + 1, ')');
     
     const tasksMap = new Map<string, ProductTask>();
     const statusesMap = new Map<string, TaskStatus>();
@@ -189,23 +198,47 @@ export default function MyProductsPage() {
     
     for (const product of products) {
       try {
+        console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
+        
         const task = await productTaskService.getProductTask(user.uid, product.id);
         
         if (task) {
+          console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
           tasksMap.set(product.id, task);
           
           // Get task status
           const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
           statusesMap.set(product.id, status);
+          console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
+        } else {
+          console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
         }
       } catch (error) {
         console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
       }
     }
     
+    console.log('[PRODUCTS] Final tasks map:', tasksMap.size, 'tasks loaded');
+    console.log('[PRODUCTS] Final statuses map:', statusesMap.size, 'statuses loaded');
+    
     setProductTasks(tasksMap);
     setTaskStatuses(statusesMap);
     updateCountdowns();
+    
+    // Show notification if tasks were loaded
+    if (tasksMap.size > 0) {
+      console.log('[PRODUCTS] Successfully loaded', tasksMap.size, 'tasks');
+    } else {
+      console.warn('[PRODUCTS] No tasks were loaded for any products');
+      
+      // Retry once after a delay if no tasks were found (in case task creation is delayed)
+      if (retryCount === 0) {
+        console.log('[PRODUCTS] No tasks found, retrying after 3 seconds...');
+        setTimeout(() => {
+          loadProductTasks(products, 1);
+        }, 3000);
+      }
+    }
   };
 
   const updateCountdowns = () => {
@@ -384,6 +417,27 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
+          <Button 
+            onClick={() => {
+              console.log('[PRODUCTS] Manual refresh triggered');
+              loadPurchasedProducts();
+            }} 
+            disabled={loading || loadingTasks}
+            variant="outline"
+            size="sm"
+          >
+            {loading || loadingTasks ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </>
+            )}
+          </Button>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards
