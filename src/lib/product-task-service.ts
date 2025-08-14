@@ -1,5 +1,6 @@
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { UserService, TransactionService } from './user-service';
 
 export interface ProductTask {
   id: string;
@@ -254,7 +255,22 @@ export class ProductTaskService {
         lastActionTime: null
       });
 
-      console.log(`[TASK] Completed daily task for ${task.productName}, earned ₦${task.dailyReward}`);
+      // Credit user balance immediately and record transaction
+      const user = await UserService.getUserById(userId);
+      if (user) {
+        const updatedUser = { ...user, balance: (user.balance || 0) + task.dailyReward };
+        await UserService.saveUser(updatedUser);
+
+        await TransactionService.createTransaction({
+          userId: userId,
+          userEmail: user.email || '',
+          type: 'Investment',
+          amount: task.dailyReward,
+          status: 'Completed',
+          date: new Date().toISOString(),
+          description: `Daily task reward for ${task.productName}`
+        });
+      }
 
       return {
         success: true,

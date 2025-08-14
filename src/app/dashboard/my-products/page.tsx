@@ -313,6 +313,11 @@ export default function MyProductsPage() {
             // Update task status
             const status = await productTaskService.canCompleteProductTask(user.uid, productId);
             setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            
+            // Show user-facing toast instead of console
+            alert('Action completed!');
+          } else {
+            alert('Action completed!');
           }
         }
         
@@ -346,6 +351,11 @@ export default function MyProductsPage() {
             // Update task status
             const status = await productTaskService.canCompleteProductTask(user.uid, productId);
             setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            
+            // Inform user about reward
+            alert(`Daily task completed! Reward added to your balance.`);
+          } else {
+            alert(`Daily task completed! Reward added to your balance.`);
           }
         }
         
