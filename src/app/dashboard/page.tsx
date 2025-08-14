@@ -762,15 +762,29 @@ export default function DashboardPage() {
         }
       
       // Show success message with instructions
+      const isSpecialPlan = planType === 'Special';
       toast({ 
           title: "Investment Successful!", 
-          description: `You have invested in ${product.name}. Check "My Products" to start completing daily tasks and earn rewards!`,
+          description: isSpecialPlan 
+            ? `You have invested in ${product.name}. Your daily tasks will be ready in a moment!`
+            : `You have invested in ${product.name}. Check "My Products" to start completing daily tasks and earn rewards!`,
           duration: 5000
       });
       
       // Show investment success banner
       setLastInvestedProduct(product.name);
       setShowInvestmentSuccess(true);
+      
+      // For Special plans, show a special notification about tasks
+      if (isSpecialPlan) {
+        setTimeout(() => {
+          toast({ 
+            title: "Daily Tasks Ready!", 
+            description: `Your daily tasks for ${product.name} are now available. Go to "My Products" to start earning!`,
+            duration: 8000
+          });
+        }, 3000); // Wait 3 seconds for task creation
+      }
       
       // Force refresh of products list
       console.log('[DASHBOARD] Investment completed, products should now be visible in My Products');
