@@ -228,6 +228,12 @@ export default function MyProductsPage() {
     // Show notification if tasks were loaded
     if (tasksMap.size > 0) {
       console.log('[PRODUCTS] Successfully loaded', tasksMap.size, 'tasks');
+      
+      // Show success notification
+      const specialPlans = products.filter(p => p.planType === 'Special');
+      if (specialPlans.length > 0) {
+        console.log('[PRODUCTS] Special plans found:', specialPlans.map(p => p.name));
+      }
     } else {
       console.warn('[PRODUCTS] No tasks were loaded for any products');
       
@@ -593,23 +599,42 @@ export default function MyProductsPage() {
                             // Special plan but no task - show loading or error state
                             <div className="text-center p-4 border rounded-lg">
                               <div className="flex items-center justify-center gap-2 mb-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                <span className="font-medium">Loading Task...</span>
+                                <AlertCircle className="h-6 w-6 text-orange-500" />
+                                <span className="font-medium text-orange-600">Task Not Found</span>
                               </div>
                               <p className="text-sm text-muted-foreground mb-3">
-                                Setting up your daily task system. This may take a moment.
+                                The daily task system for this Special plan could not be loaded. This might be due to:
                               </p>
-                              <Button 
-                                onClick={() => {
-                                  console.log('[PRODUCTS] Manually refreshing task for Special plan:', product.id);
-                                  loadProductTasks([product]);
-                                }}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                                Refresh Task
-                              </Button>
+                              <ul className="text-xs text-muted-foreground mb-4 text-left space-y-1">
+                                <li>• Task creation is still in progress</li>
+                                <li>• Database connection issue</li>
+                                <li>• Task was not created during purchase</li>
+                              </ul>
+                              <div className="space-y-2">
+                                <Button 
+                                  onClick={() => {
+                                    console.log('[PRODUCTS] Manually refreshing task for Special plan:', product.id);
+                                    loadProductTasks([product]);
+                                  }}
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Refresh Task
+                                </Button>
+                                <Button 
+                                  onClick={() => {
+                                    console.log('[PRODUCTS] Going back to dashboard to re-purchase');
+                                    window.location.href = '/dashboard';
+                                  }}
+                                  variant="secondary"
+                                  size="sm"
+                                  className="w-full"
+                                >
+                                  Back to Dashboard
+                                </Button>
+                              </div>
                             </div>
                           )
                         ) : product.planType === 'Basic' || product.planType === 'Premium' ? (
