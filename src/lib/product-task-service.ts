@@ -134,12 +134,15 @@ export class ProductTaskService {
         const data = taskDoc.data();
         console.log(`[TASK] Task data retrieved:`, data);
         
-        // Handle date conversions properly
+        // Handle date conversions properly - support both Firestore Timestamp and regular Date objects
         const task = {
           ...data,
-          lastCompletedAt: data.lastCompletedAt ? new Date(data.lastCompletedAt.toDate()) : null,
-          nextAvailableTime: data.nextAvailableTime ? new Date(data.nextAvailableTime.toDate()) : null,
-          lastActionTime: data.lastActionTime ? new Date(data.lastActionTime.toDate()) : null
+          lastCompletedAt: data.lastCompletedAt ? 
+            (data.lastCompletedAt.toDate ? data.lastCompletedAt.toDate() : new Date(data.lastCompletedAt)) : null,
+          nextAvailableTime: data.nextAvailableTime ? 
+            (data.nextAvailableTime.toDate ? data.nextAvailableTime.toDate() : new Date(data.nextAvailableTime)) : null,
+          lastActionTime: data.lastActionTime ? 
+            (data.lastActionTime.toDate ? data.lastActionTime.toDate() : new Date(data.lastActionTime)) : null
         } as ProductTask;
         
         console.log(`[TASK] Processed task object:`, task);
@@ -232,11 +235,14 @@ export class ProductTaskService {
         };
       }
 
-      // Check 24-hour cooldown
+      // STRICT 24-hour cooldown check
       if (task.lastCompletedAt) {
         const now = new Date();
-        const timeSinceLastCompletion = now.getTime() - task.lastCompletedAt.getTime();
+        const lastCompletion = new Date(task.lastCompletedAt);
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        
+        console.log(`[TASK] Cooldown check: Last completion: ${lastCompletion}, Now: ${now}, Hours remaining: ${hoursRemaining}`);
         
         if (hoursRemaining > 0) {
           const hours = Math.floor(hoursRemaining);
@@ -261,16 +267,25 @@ export class ProductTaskService {
       const newCompletedActions = 0;
       const newCurrentActionStep = 1;
 
+      // Use Firestore timestamp for lastCompletedAt
+      const now = new Date();
+      const firestoreTimestamp = {
+        seconds: Math.floor(now.getTime() / 1000),
+        nanoseconds: (now.getTime() % 1000) * 1000000
+      };
+
       await updateDoc(doc(db, this.collectionName, task.id), {
         totalEarned: newTotalEarned,
         cycleDaysCompleted: newCycleDaysCompleted,
         isExpired,
         nextAvailableTime,
-        lastCompletedAt: new Date(),
+        lastCompletedAt: firestoreTimestamp,
         completedActions: newCompletedActions,
         currentActionStep: newCurrentActionStep,
         lastActionTime: null
       });
+
+      console.log(`[TASK] Task completed and locked for 24 hours. Next available: ${nextAvailableTime}`);
 
       // Credit user balance immediately and record transaction
       const user = await UserService.getUserById(userId);
@@ -291,7 +306,7 @@ export class ProductTaskService {
 
       return {
         success: true,
-        message: `Daily task completed! Earned ₦${task.dailyReward.toLocaleString()}`,
+        message: `Daily task completed! Earned ₦${task.dailyReward.toLocaleString()}. Task locked for 24 hours.`,
         reward: task.dailyReward
       };
     } catch (error) {
@@ -343,11 +358,14 @@ export class ProductTaskService {
         };
       }
 
-      // Check 24-hour cooldown
+      // STRICT 24-hour cooldown check
       if (task.lastCompletedAt) {
         const now = new Date();
-        const timeSinceLastCompletion = now.getTime() - task.lastCompletedAt.getTime();
+        const lastCompletion = new Date(task.lastCompletedAt);
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        
+        console.log(`[TASK] Status check - Cooldown: Last completion: ${lastCompletion}, Now: ${now}, Hours remaining: ${hoursRemaining}`);
         
         if (hoursRemaining > 0) {
           const hours = Math.floor(hoursRemaining);
@@ -604,6 +622,42 @@ export class ProductTaskService {
     }
   }
 
+  // Check if a task is currently locked (within 24-hour cooldown)
+  async isTaskLocked(userId: string, productId: string): Promise<{
+    isLocked: boolean;
+    hoursRemaining: number;
+    minutesRemaining: number;
+    message: string;
+  }> {
+    try {
+      const task = await this.getProductTask(userId, productId);
+      if (!task || !task.lastCompletedAt) {
+        return { isLocked: false, hoursRemaining: 0, minutesRemaining: 0, message: 'Task not found or never completed' };
+      }
+
+      const now = new Date();
+      const lastCompletion = new Date(task.lastCompletedAt);
+      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+      const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+      
+      if (hoursRemaining > 0) {
+        const hours = Math.floor(hoursRemaining);
+        const minutes = Math.floor((hoursRemaining - hours) * 60);
+        return {
+          isLocked: true,
+          hoursRemaining: hours,
+          minutesRemaining: minutes,
+          message: `Task locked for ${hours}h ${minutes}m`
+        };
+      }
+      
+      return { isLocked: false, hoursRemaining: 0, minutesRemaining: 0, message: 'Task ready to complete' };
+    } catch (error) {
+      console.error('[ERROR] Failed to check task lock status:', error);
+      return { isLocked: false, hoursRemaining: 0, minutesRemaining: 0, message: 'Error checking status' };
+    }
+  }
+
   // Get task statistics for analytics
   async getTaskStatistics(userId: string): Promise<{
     totalTasks: number;
@@ -694,6 +748,22 @@ export class ProductTaskService {
       return true;
     } catch (error) {
       console.error('[ERROR] Failed to delete product task:', error);
+      return false;
+    }
+  }
+
+  // Reset task cooldown (for testing purposes - remove in production)
+  async resetTaskCooldown(userId: string, productId: string): Promise<boolean> {
+    try {
+      const taskId = `${userId}_${productId}`;
+      await updateDoc(doc(db, this.collectionName, taskId), {
+        lastCompletedAt: null,
+        nextAvailableTime: null
+      });
+      console.log(`[TASK] Reset cooldown for product ${productId}`);
+      return true;
+    } catch (error) {
+      console.error('[ERROR] Failed to reset task cooldown:', error);
       return false;
     }
   }
