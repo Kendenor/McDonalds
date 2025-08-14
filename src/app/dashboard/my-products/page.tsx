@@ -238,12 +238,15 @@ export default function MyProductsPage() {
         // Update the task in state
         const task = productTasks.get(productId);
         if (task) {
-          const updatedTask = { ...task, completedActions: result.progress / 20 }; // 20% per action
-          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-          
-          // Update task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          // Reload the task to get the updated state from database
+          const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+          if (updatedTask) {
+            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+            
+            // Update task status
+            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          }
         }
         
         // Show success message
@@ -268,19 +271,15 @@ export default function MyProductsPage() {
         // Update the task in state
         const task = productTasks.get(productId);
         if (task) {
-          const updatedTask = { 
-            ...task, 
-            totalEarned: task.totalEarned + (result.reward || 0),
-            cycleDaysCompleted: task.cycleDaysCompleted + 1,
-            completedActions: 0,
-            currentActionStep: 1,
-            lastCompletedAt: new Date()
-          };
-          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-          
-          // Update task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          // Reload the task to get the updated state from database
+          const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+          if (updatedTask) {
+            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+            
+            // Update task status
+            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          }
         }
         
         // Show success message

@@ -330,12 +330,27 @@ export default function DashboardPage() {
   const [lastInvestedProduct, setLastInvestedProduct] = useState('');
 
   // Check if user has purchased any Basic products
-  const hasBasicProducts = useMemo(() => {
-    if (!userData?.purchasedProducts) return false;
-    return userData.purchasedProducts.some((product: any) => 
-      product.planType === 'Basic' && product.status === 'Active'
-    );
-  }, [userData?.purchasedProducts]);
+  const [hasBasicProducts, setHasBasicProducts] = useState(false);
+
+  // Check for basic products when user data changes
+  useEffect(() => {
+    const checkBasicProducts = async () => {
+      if (!user) return;
+      
+      try {
+        const userProducts = await ProductService.getUserProducts(user.uid);
+        const hasBasic = userProducts.some((product: any) => 
+          product.planType === 'Basic' && product.status === 'Active'
+        );
+        setHasBasicProducts(hasBasic);
+      } catch (error) {
+        console.error('Error checking basic products:', error);
+        setHasBasicProducts(false);
+      }
+    };
+
+    checkBasicProducts();
+  }, [user, userData]);
 
   const { toast } = useToast();
 
@@ -738,8 +753,13 @@ export default function DashboardPage() {
 
         // Update canAccessSpecialPlans if this is a basic plan
         if (planType === 'Basic') {
-          // setCanAccessSpecialPlans(true); // This state is not defined in this component's scope
-      }
+          // Refresh basic products check to unlock Special/Premium plans
+          const userProducts = await ProductService.getUserProducts(user.uid);
+          const hasBasic = userProducts.some((product: any) => 
+            product.planType === 'Basic' && product.status === 'Active'
+          );
+          setHasBasicProducts(hasBasic);
+        }
       
       // Show success message with instructions
       toast({ 

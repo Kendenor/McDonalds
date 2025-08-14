@@ -96,6 +96,7 @@ export class ProductTaskService {
         throw new Error('Task was not saved properly - verification failed');
       }
       
+      console.log(`[TASK] Task creation completed successfully for ${productName}`);
       return task;
     } catch (error) {
       console.error('[TASK] Failed to create product task:', error);
