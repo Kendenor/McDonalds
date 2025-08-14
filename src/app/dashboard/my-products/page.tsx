@@ -196,27 +196,55 @@ export default function MyProductsPage() {
     const statusesMap = new Map<string, TaskStatus>();
     const productTaskService = new ProductTaskService();
     
-    for (const product of products) {
-      try {
-        console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
-        
-        const task = await productTaskService.getProductTask(user.uid, product.id);
-        
-        if (task) {
-          console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
-          tasksMap.set(product.id, task);
-          
-          // Get task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-          statusesMap.set(product.id, status);
-          console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
-        } else {
-          console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
-        }
-      } catch (error) {
-        console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
-      }
-    }
+                      for (const product of products) {
+                    try {
+                      console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
+                      console.log(`[PRODUCTS] Product details:`, {
+                        id: product.id,
+                        name: product.name,
+                        planType: product.planType,
+                        status: product.status
+                      });
+
+                      const task = await productTaskService.getProductTask(user.uid, product.id);
+
+                      if (task) {
+                        console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
+                        tasksMap.set(product.id, task);
+
+                        // Get task status
+                        const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                        statusesMap.set(product.id, status);
+                        console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
+                      } else {
+                        console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
+                        
+                        // For Special plans, try to create the task if it doesn't exist
+                        if (product.planType === 'Special') {
+                          console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
+                          try {
+                            const newTask = await productTaskService.createProductTask(
+                              user.uid,
+                              product.id,
+                              product.name,
+                              product.totalEarning,
+                              product.cycleDays
+                            );
+                            console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
+                            tasksMap.set(product.id, newTask);
+                            
+                            // Get task status for new task
+                            const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                            statusesMap.set(product.id, status);
+                          } catch (createError) {
+                            console.error(`[PRODUCTS] Failed to create missing task for ${product.name}:`, createError);
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
+                    }
+                  }
     
     console.log('[PRODUCTS] Final tasks map:', tasksMap.size, 'tasks loaded');
     console.log('[PRODUCTS] Final statuses map:', statusesMap.size, 'statuses loaded');
@@ -471,7 +499,13 @@ export default function MyProductsPage() {
                   productId: product.id,
                   hasTask: !!task,
                   task: task,
-                  status: status
+                  status: status,
+                  productData: {
+                    name: product.name,
+                    planType: product.planType,
+                    status: product.status,
+                    startDate: product.startDate
+                  }
                 });
               }
               
