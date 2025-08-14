@@ -177,16 +177,41 @@ export class ProductTaskService {
         return { success: false, message: 'Invalid action type', progress: task.completedActions };
       }
 
-      // Check if action was already completed today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (task.lastActionTime && task.lastActionTime >= today) {
-        // Check if this specific action was already completed
-        const actionIndex = task.actionTypes.indexOf(actionType);
-        if (task.completedActions > actionIndex) {
-          return { success: false, message: 'This action was already completed today', progress: task.completedActions };
+      // IMPORTANT: Check if 24-hour cooldown has expired and reset actions if needed
+      if (task.completedActions === 5 && task.lastCompletedAt) {
+        const now = new Date();
+        const lastCompletion = new Date(task.lastCompletedAt);
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        
+        if (hoursRemaining > 0) {
+          const hours = Math.floor(hoursRemaining);
+          const minutes = Math.floor((hoursRemaining - hours) * 60);
+          return { 
+            success: false, 
+            message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.`, 
+            progress: 5 
+          };
+        } else {
+          // 24 hours have passed, reset actions for next cycle
+          console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, resetting actions for next cycle`);
+          await updateDoc(doc(db, this.collectionName, task.id), {
+            completedActions: 0,
+            currentActionStep: 1,
+            lastActionTime: null
+          });
+          
+          // Update local task object
+          task.completedActions = 0;
+          task.currentActionStep = 1;
+          task.lastActionTime = null;
         }
+      }
+
+      // Check if action was already completed in current cycle
+      const actionIndex = task.actionTypes.indexOf(actionType);
+      if (task.completedActions > actionIndex) {
+        return { success: false, message: 'This action was already completed in current cycle', progress: task.completedActions };
       }
 
       // Complete the action
@@ -263,9 +288,10 @@ export class ProductTaskService {
       const nextAvailableTime = new Date();
       nextAvailableTime.setHours(nextAvailableTime.getHours() + 24);
 
-      // Reset actions for next day
-      const newCompletedActions = 0;
-      const newCurrentActionStep = 1;
+      // IMPORTANT: Keep actions at 5 (completed) but lock the task for 24 hours
+      // User will need to wait 24 hours before they can start the 5 actions again
+      const newCompletedActions = 5; // Keep at 5 to show all actions are done
+      const newCurrentActionStep = 5; // Keep at step 5
 
       // Use Firestore timestamp for lastCompletedAt
       const now = new Date();
@@ -280,8 +306,8 @@ export class ProductTaskService {
         isExpired,
         nextAvailableTime,
         lastCompletedAt: firestoreTimestamp,
-        completedActions: newCompletedActions,
-        currentActionStep: newCurrentActionStep,
+        completedActions: newCompletedActions, // Keep at 5
+        currentActionStep: newCurrentActionStep, // Keep at 5
         lastActionTime: null
       });
 
@@ -356,6 +382,36 @@ export class ProductTaskService {
           progress,
           remainingActions: remaining
         };
+      }
+
+      // If all actions are completed (5/5), check if 24-hour cooldown has expired
+      if (task.completedActions === 5 && task.lastCompletedAt) {
+        const now = new Date();
+        const lastCompletion = new Date(task.lastCompletedAt);
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        
+        if (hoursRemaining > 0) {
+          const hours = Math.floor(hoursRemaining);
+          const minutes = Math.floor((hoursRemaining - hours) * 60);
+          return { 
+            canComplete: false, 
+            message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.`,
+            hoursRemaining: hours,
+            minutesRemaining: minutes,
+            progress: 100,
+            remainingActions: 0
+          };
+        } else {
+          // 24 hours have passed, actions should be reset for next cycle
+          console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, actions should be reset`);
+          return { 
+            canComplete: false, 
+            message: `Actions reset for next cycle! Complete 5 actions again to earn your daily reward.`,
+            progress: 0,
+            remainingActions: 5
+          };
+        }
       }
 
       // STRICT 24-hour cooldown check
@@ -480,7 +536,7 @@ export class ProductTaskService {
       );
       const querySnapshot = await getDocs(tasksQuery);
       
-      return querySnapshot.docs.map(doc => {
+      const tasks = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           ...data,
@@ -489,6 +545,23 @@ export class ProductTaskService {
           lastActionTime: data.lastActionTime ? new Date(data.lastActionTime.toDate()) : null
         } as ProductTask;
       });
+
+      // Check and reset actions for tasks where 24-hour cooldown has expired
+      for (const task of tasks) {
+        if (task.completedActions === 5 && task.lastCompletedAt) {
+          const now = new Date();
+          const lastCompletion = new Date(task.lastCompletedAt);
+          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          if (hoursRemaining <= 0) {
+            console.log(`[TASK] Auto-resetting actions for ${task.productName} - 24-hour cooldown expired`);
+            await this.checkAndResetActionsAfterCooldown(userId, task.productId);
+          }
+        }
+      }
+      
+      return tasks;
     } catch (error) {
       console.error('[ERROR] Failed to get user product tasks:', error);
       return [];
@@ -655,6 +728,45 @@ export class ProductTaskService {
     } catch (error) {
       console.error('[ERROR] Failed to check task lock status:', error);
       return { isLocked: false, hoursRemaining: 0, minutesRemaining: 0, message: 'Error checking status' };
+    }
+  }
+
+  // Check if 24-hour cooldown has expired and reset actions for next cycle
+  async checkAndResetActionsAfterCooldown(userId: string, productId: string): Promise<{
+    wasReset: boolean;
+    message: string;
+  }> {
+    try {
+      const task = await this.getProductTask(userId, productId);
+      if (!task || !task.lastCompletedAt) {
+        return { wasReset: false, message: 'Task not found or never completed' };
+      }
+
+      const now = new Date();
+      const lastCompletion = new Date(task.lastCompletedAt);
+      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+      const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+      
+      // If 24 hours have passed, reset actions for next cycle
+      if (hoursRemaining <= 0 && task.completedActions === 5) {
+        console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, resetting actions for next cycle`);
+        
+        await updateDoc(doc(db, this.collectionName, task.id), {
+          completedActions: 0,
+          currentActionStep: 1,
+          lastActionTime: null
+        });
+        
+        return { 
+          wasReset: true, 
+          message: `Actions reset for next cycle! Complete 5 actions again to earn your daily reward.` 
+        };
+      }
+      
+      return { wasReset: false, message: 'Cooldown not expired yet' };
+    } catch (error) {
+      console.error('[ERROR] Failed to check and reset actions:', error);
+      return { wasReset: false, message: 'Error checking cooldown status' };
     }
   }
 
