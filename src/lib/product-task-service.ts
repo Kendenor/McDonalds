@@ -2,6 +2,11 @@ import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { UserService, TransactionService } from './user-service';
 
+// Ensure database is initialized
+if (!db) {
+  console.error('[TASK] Database not initialized! Firebase may not be ready.');
+}
+
 export interface ProductTask {
   id: string;
   userId: string;
@@ -43,6 +48,12 @@ export class ProductTaskService {
     totalReturn: number,
     cycleDays: number
   ): Promise<ProductTask> {
+    // Check if database is initialized
+    if (!db) {
+      console.error('[TASK] Database not initialized! Cannot create task.');
+      throw new Error('Database not initialized');
+    }
+    
     console.log(`[TASK] Creating product task for:`, { userId, productId, productName, totalReturn, cycleDays });
     
     const dailyReward = Math.floor(totalReturn / cycleDays);
@@ -97,7 +108,7 @@ export class ProductTaskService {
         throw new Error('Task was not saved properly - verification failed');
       }
       
-      console.log(`[TASK] Task creation completed successfully for ${productName}`);
+      console.log(`[PRODUCTS] Task creation completed successfully for ${productName}`);
       return task;
     } catch (error) {
       console.error('[TASK] Failed to create product task:', error);
@@ -106,6 +117,12 @@ export class ProductTaskService {
   }
 
   async getProductTask(userId: string, productId: string): Promise<ProductTask | null> {
+    // Check if database is initialized
+    if (!db) {
+      console.error('[TASK] Database not initialized! Cannot get task.');
+      return null;
+    }
+    
     try {
       const taskId = `${userId}_${productId}`;
       console.log(`[TASK] Getting product task with ID: ${taskId}`);

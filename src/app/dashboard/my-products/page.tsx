@@ -231,7 +231,9 @@ export default function MyProductsPage() {
           id: product.id,
           name: product.name,
           planType: product.planType,
-          status: product.status
+          status: product.status,
+          totalEarning: product.totalEarning,
+          cycleDays: product.cycleDays
         });
 
         let task = await productTaskService.getProductTask(user.uid, product.id);
@@ -250,6 +252,14 @@ export default function MyProductsPage() {
           // For Special plans, try to create the task if it doesn't exist
           if (product.planType === 'Special') {
             console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
+            console.log(`[PRODUCTS] Creating task with params:`, {
+              userId: user.uid,
+              productId: product.id,
+              productName: product.name,
+              totalReturn: product.totalEarning,
+              cycleDays: product.cycleDays
+            });
+            
             try {
               const newTask = await productTaskService.createProductTask(
                 user.uid,
@@ -268,11 +278,16 @@ export default function MyProductsPage() {
                 statusesMap.set(product.id, status);
                 
                 console.log(`[PRODUCTS] Task created and status loaded for ${product.name}:`, status);
+                
+                // Immediately update the UI for this product
+                setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
               } else {
                 console.error(`[PRODUCTS] Task creation returned null for ${product.name}`);
               }
             } catch (createError) {
               console.error(`[PRODUCTS] Failed to create missing task for ${product.name}:`, createError);
+              console.error(`[PRODUCTS] Error details:`, createError);
               
               // Try to create task again after a short delay
               setTimeout(async () => {
@@ -293,6 +308,7 @@ export default function MyProductsPage() {
                   }
                 } catch (retryError) {
                   console.error(`[PRODUCTS] Retry failed for ${product.name}:`, retryError);
+                  console.error(`[PRODUCTS] Retry error details:`, retryError);
                 }
               }, 2000);
             }
@@ -300,6 +316,7 @@ export default function MyProductsPage() {
         }
       } catch (error) {
         console.error(`[PRODUCTS] Failed to load task for product ${product.id}:`, error);
+        console.error(`[PRODUCTS] Error details:`, error);
       }
     }
     
@@ -521,21 +538,41 @@ export default function MyProductsPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
-          <Button 
-            onClick={() => {
-              console.log('[DEBUG] Manual task creation triggered');
-              const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
-              if (specialPlans.length > 0) {
-                console.log('[DEBUG] Found Special plans:', specialPlans);
-                loadProductTasks(specialPlans);
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-          >
-            Debug: Create Tasks
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => {
+                console.log('[DEBUG] Manual task creation triggered');
+                const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
+                if (specialPlans.length > 0) {
+                  console.log('[DEBUG] Found Special plans:', specialPlans);
+                  loadProductTasks(specialPlans);
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              Debug: Create Tasks
+            </Button>
+            <Button 
+              onClick={() => {
+                console.log('[DEBUG] Testing Firebase connection...');
+                import('@/lib/firebase').then(({ db }) => {
+                  console.log('[DEBUG] Firebase db object:', db);
+                  if (db) {
+                    console.log('[DEBUG] Database is initialized');
+                  } else {
+                    console.error('[DEBUG] Database is NOT initialized!');
+                  }
+                });
+              }}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              Test Firebase
+            </Button>
+          </div>
         </div>
         <p className="text-muted-foreground">
           Manage your investments and complete daily tasks to earn rewards
