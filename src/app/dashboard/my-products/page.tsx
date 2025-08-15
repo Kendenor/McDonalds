@@ -90,7 +90,7 @@ export default function MyProductsPage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [productTasks, setProductTasks] = useState<Map<string, ProductTask>>(new Map());
   const [taskStatuses, setTaskStatuses] = useState<Map<string, TaskStatus>>(new Map());
-  const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number }>>(new Map());
+  const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number; seconds: number }>>(new Map());
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -264,23 +264,17 @@ export default function MyProductsPage() {
     return () => clearInterval(interval);
   }, [user, purchasedProducts, productTasks]);
 
-  // Real-time countdown timer - update every minute
+  // Real-time countdown timer - update every second for better UX
   useEffect(() => {
     if (productTasks.size === 0) return;
     
     const interval = setInterval(() => {
       updateCountdowns();
-    }, 60000); // Update every minute
+    }, 1000); // Update every second for real-time countdown
     
     // Initial update
     updateCountdowns();
     
-    return () => clearInterval(interval);
-  }, [productTasks]);
-
-  useEffect(() => {
-    // Update countdowns every minute
-    const interval = setInterval(updateCountdowns, 60000);
     return () => clearInterval(interval);
   }, [productTasks]);
 
@@ -517,7 +511,7 @@ export default function MyProductsPage() {
   };
 
   const updateCountdowns = () => {
-    const countdownsMap = new Map<string, { hours: number; minutes: number }>();
+    const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
     
     productTasks.forEach((task, productId) => {
       // Check if task is locked (completed actions = 5 and has lastCompletedAt)
@@ -530,7 +524,8 @@ export default function MyProductsPage() {
         if (hoursRemaining > 0) {
           const hours = Math.floor(hoursRemaining);
           const minutes = Math.floor((hoursRemaining - hours) * 60);
-          countdownsMap.set(productId, { hours, minutes });
+          const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+          countdownsMap.set(productId, { hours, minutes, seconds });
         }
       }
       // Also check nextAvailableTime for legacy support
@@ -541,7 +536,8 @@ export default function MyProductsPage() {
         if (timeRemaining > 0) {
           const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
           const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-          countdownsMap.set(productId, { hours, minutes });
+          const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+          countdownsMap.set(productId, { hours, minutes, seconds });
         }
       }
     });
@@ -859,22 +855,57 @@ export default function MyProductsPage() {
                               ) : (
                                 <div className="text-center">
                                   {countdown ? (
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                       <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
                                         <Clock className="h-4 w-4" />
-                                        <span className="font-medium">Task Locked</span>
+                                        <span className="font-medium">⏰ Task Locked - Countdown Active</span>
                                       </div>
-                                      <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                                        <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                                          {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}
-                                        </div>
-                                        <div className="text-xs text-orange-500 dark:text-orange-300">
-                                          Hours : Minutes remaining
+                                      
+                                      {/* Enhanced Countdown Display */}
+                                      <div className={`p-4 rounded-lg border transition-all duration-500 ${
+                                        countdown.hours === 0 && countdown.minutes <= 5 
+                                          ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
+                                          : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800'
+                                      }`}>
+                                        <div className="text-center">
+                                          <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                            {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}:{countdown.seconds.toString().padStart(2, '0')}
+                                          </div>
+                                          <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                            Hours : Minutes : Seconds Remaining
+                                          </div>
+                                          {countdown.hours === 0 && countdown.minutes <= 5 && (
+                                            <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
+                                              ⚡ Almost ready! Get prepared for next task cycle!
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
-                                      <p className="text-xs text-muted-foreground">
-                                        Complete 5 actions again after countdown expires
-                                      </p>
+                                      
+                                      {/* Progress Bar for Visual Feedback */}
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                          <span>Time Remaining</span>
+                                          <span>{Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100)}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                          <div 
+                                            className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
+                                            style={{ 
+                                              width: `${Math.max(0, Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100))}%` 
+                                            }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="text-center">
+                                        <p className="text-xs text-muted-foreground">
+                                          🔒 Complete 5 actions again after countdown expires
+                                        </p>
+                                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                          Next task cycle will be available soon!
+                                        </p>
+                                      </div>
                                     </div>
                                   ) : (
                                     <p className="text-sm text-muted-foreground">{status?.message}</p>
