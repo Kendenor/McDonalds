@@ -278,6 +278,43 @@ export default function MyProductsPage() {
     return () => clearInterval(interval);
   }, [productTasks]);
 
+  // Manual countdown calculation for tasks that should be locked
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const manualCountdowns = new Map<string, { hours: number; minutes: number; seconds: number }>();
+      
+      productTasks.forEach((task, productId) => {
+        // If task has 5 completed actions and lastCompletedAt, calculate countdown manually
+        if (task.completedActions === 5 && task.lastCompletedAt) {
+          const now = new Date();
+          const lastCompletion = new Date(task.lastCompletedAt);
+          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          if (hoursRemaining > 0) {
+            const hours = Math.floor(hoursRemaining);
+            const minutes = Math.floor((hoursRemaining - hours) * 60);
+            const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+            manualCountdowns.set(productId, { hours, minutes, seconds });
+          }
+        }
+      });
+      
+      // Update countdowns if we found any manual calculations
+      if (manualCountdowns.size > 0) {
+        setCountdowns(prev => {
+          const newCountdowns = new Map(prev);
+          manualCountdowns.forEach((value, key) => {
+            newCountdowns.set(key, value);
+          });
+          return newCountdowns;
+        });
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [productTasks]);
+
   const loadPurchasedProducts = async () => {
     if (!user) {
       return;
@@ -513,7 +550,15 @@ export default function MyProductsPage() {
   const updateCountdowns = () => {
     const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
     
+    console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
+    
     productTasks.forEach((task, productId) => {
+      console.log(`[COUNTDOWN] Checking task for ${task.productName}:`, {
+        completedActions: task.completedActions,
+        lastCompletedAt: task.lastCompletedAt,
+        nextAvailableTime: task.nextAvailableTime
+      });
+      
       // Check if task is locked (completed actions = 5 and has lastCompletedAt)
       if (task.completedActions === 5 && task.lastCompletedAt) {
         const now = new Date();
@@ -521,11 +566,19 @@ export default function MyProductsPage() {
         const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
+        console.log(`[COUNTDOWN] Task locked for ${task.productName}:`, {
+          lastCompletion,
+          now,
+          timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+          hoursRemaining
+        });
+        
         if (hoursRemaining > 0) {
           const hours = Math.floor(hoursRemaining);
           const minutes = Math.floor((hoursRemaining - hours) * 60);
           const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
           countdownsMap.set(productId, { hours, minutes, seconds });
+          console.log(`[COUNTDOWN] Set countdown for ${task.productName}:`, { hours, minutes, seconds });
         }
       }
       // Also check nextAvailableTime for legacy support
@@ -538,10 +591,12 @@ export default function MyProductsPage() {
           const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
           countdownsMap.set(productId, { hours, minutes, seconds });
+          console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
         }
       }
     });
     
+    console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
     setCountdowns(countdownsMap);
   };
 
