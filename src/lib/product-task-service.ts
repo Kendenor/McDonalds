@@ -414,11 +414,11 @@ export class ProductTaskService {
       // If all actions are completed (5/5), check if 24-hour cooldown has expired
       if (task.completedActions === 5) {
         // Check if user has already completed a task today (within 24 hours)
-        if (task.lastCompletedAt) {
-          const now = new Date();
+      if (task.lastCompletedAt) {
+        const now = new Date();
           const lastCompletion = new Date(task.lastCompletedAt);
           const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
           
           if (hoursRemaining > 0) {
             const hours = Math.floor(hoursRemaining);

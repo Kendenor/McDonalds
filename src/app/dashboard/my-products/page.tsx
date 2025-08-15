@@ -107,7 +107,7 @@ export default function MyProductsPage() {
   // Add real-time listener for products
   useEffect(() => {
     if (!user) return;
-
+    
     const unsubscribe = ProductService.onProductsChange(user.uid, (products) => {
       console.log('[PRODUCTS] Real-time update received:', products.length, 'products');
       
@@ -646,11 +646,11 @@ export default function MyProductsPage() {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-          
-          // Update task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+            
+            // Update task status
+            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
             // Show user-facing toast instead of console
             alert('Action completed!');
@@ -989,21 +989,21 @@ export default function MyProductsPage() {
                                 const isCompleted = isActionCompleted(product.id, actionType);
                                 const isTaskLocked = countdown && countdown.hours > 0; // Task is locked if countdown exists
                                 
-                                                                 const isActionCompleting = completingActions.get(product.id)?.has(actionType);
-                                 
-                                 return (
-                                   <Button
-                                     key={actionType}
-                                     variant={getActionButtonVariant(product.id, actionType)}
-                                     size="sm"
-                                     onClick={() => handleCompleteAction(product.id, actionType)}
-                                     disabled={isCompleted || isTaskLocked || isActionCompleting}
-                                     className={`h-10 text-xs ${isTaskLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                   >
-                                     {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                     {isTaskLocked ? 'Locked' : isActionCompleting ? 'Completing...' : getActionButtonText(product.id, actionType)}
-                                   </Button>
-                                 );
+                                const isActionCompleting = completingActions.get(product.id)?.has(actionType);
+                                
+                                return (
+                                  <Button
+                                    key={actionType}
+                                    variant={getActionButtonVariant(product.id, actionType)}
+                                    size="sm"
+                                    onClick={() => handleCompleteAction(product.id, actionType)}
+                                    disabled={isCompleted || isTaskLocked || isActionCompleting}
+                                    className={`h-10 text-xs ${isTaskLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
+                                    {isTaskLocked ? 'Locked' : isActionCompleting ? 'Completing...' : getActionButtonText(product.id, actionType)}
+                                  </Button>
+                                );
                               })}
                             </div>
 
