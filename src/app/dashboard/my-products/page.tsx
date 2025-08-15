@@ -573,10 +573,12 @@ export default function MyProductsPage() {
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
         console.log(`[COUNTDOWN] Task locked for ${task.productName}:`, {
-          lastCompletion,
-          now,
+          lastCompletion: lastCompletion.toISOString(),
+          now: now.toISOString(),
           timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-          hoursRemaining
+          hoursRemaining,
+          completedActions: task.completedActions,
+          hasLastCompletedAt: !!task.lastCompletedAt
         });
         
         if (hoursRemaining > 0) {
@@ -585,10 +587,18 @@ export default function MyProductsPage() {
           const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
           countdownsMap.set(productId, { hours, minutes, seconds });
           console.log(`[COUNTDOWN] Set countdown for ${task.productName}:`, { hours, minutes, seconds });
+        } else {
+          console.log(`[COUNTDOWN] Hours remaining is not positive for ${task.productName}: ${hoursRemaining}`);
         }
+      } else {
+        console.log(`[COUNTDOWN] Task not locked for ${task.productName}:`, {
+          completedActions: task.completedActions,
+          hasLastCompletedAt: !!task.lastCompletedAt
+        });
       }
+      
       // Also check nextAvailableTime for legacy support
-      else if (task.nextAvailableTime) {
+      if (task.nextAvailableTime) {
         const now = new Date();
         const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
         
@@ -707,6 +717,15 @@ export default function MyProductsPage() {
               const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
               const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
               
+              console.log(`[IMMEDIATE COUNTDOWN] Debug info for ${updatedTask.productName}:`, {
+                now: now.toISOString(),
+                lastCompletion: lastCompletion.toISOString(),
+                timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+                hoursRemaining,
+                completedActions: updatedTask.completedActions,
+                hasLastCompletedAt: !!updatedTask.lastCompletedAt
+              });
+              
               if (hoursRemaining > 0) {
                 const hours = Math.floor(hoursRemaining);
                 const minutes = Math.floor((hoursRemaining - hours) * 60);
@@ -719,7 +738,14 @@ export default function MyProductsPage() {
                   console.log(`[IMMEDIATE COUNTDOWN] Set countdown for ${updatedTask.productName}:`, { hours, minutes, seconds });
                   return newCountdowns;
                 });
+              } else {
+                console.log(`[IMMEDIATE COUNTDOWN] Hours remaining is not positive: ${hoursRemaining}`);
               }
+            } else {
+              console.log(`[IMMEDIATE COUNTDOWN] Task not ready for countdown:`, {
+                completedActions: updatedTask.completedActions,
+                hasLastCompletedAt: !!updatedTask.lastCompletedAt
+              });
             }
             
             setTimeout(() => {
@@ -1079,6 +1105,21 @@ export default function MyProductsPage() {
                                     <p>countdown: {countdown ? `${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s` : 'null'}</p>
                                     <p>status.canComplete: {status?.canComplete ? 'true' : 'false'}</p>
                                     <p>status.message: {status?.message}</p>
+                                    <p>Task Locked: {task.completedActions === 5 && task.lastCompletedAt ? 'YES' : 'NO'}</p>
+                                    <p>Countdown Ready: {countdown ? 'YES' : 'NO'}</p>
+                                  </div>
+                                  <div className="mt-2">
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => {
+                                        console.log('[DEBUG] Current task state:', task);
+                                        console.log('[DEBUG] Current countdowns:', countdowns);
+                                        updateCountdowns();
+                                      }}
+                                    >
+                                      Test Countdown
+                                    </Button>
                                   </div>
                                 </details>
                               </div>
