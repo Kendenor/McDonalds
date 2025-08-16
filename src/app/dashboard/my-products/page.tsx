@@ -554,23 +554,7 @@ export default function MyProductsPage() {
     }
   };
 
-  // Helper function to calculate countdown for a task
-  const calculateTaskCountdown = (task: any) => {
-    if (task.completedActions === 5 && task.lastCompletedAt) {
-      const now = new Date();
-      const lastCompletion = new Date(task.lastCompletedAt);
-      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-      const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-      
-      if (hoursRemaining > 0) {
-        const hours = Math.floor(hoursRemaining);
-        const minutes = Math.floor((hoursRemaining - hours) * 60);
-        const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-        return { hours, minutes, seconds };
-      }
-    }
-    return null;
-  };
+
 
   const updateCountdowns = () => {
     const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
@@ -1064,108 +1048,80 @@ export default function MyProductsPage() {
                               {/* PRIORITY 1: Show countdown if task is locked (completedActions === 5 and has lastCompletedAt) */}
                               {task.completedActions === 5 && task.lastCompletedAt ? (
                                 (() => {
-                                  // Calculate countdown if not available in state
-                                  let displayCountdown = countdown;
-                                  if (!displayCountdown && task.lastCompletedAt) {
-                                    console.log('[DEBUG] Calculating fallback countdown for task:', task.productName);
-                                    console.log('[DEBUG] lastCompletedAt:', task.lastCompletedAt);
+                                  // Calculate countdown on-the-fly
+                                  const now = new Date();
+                                  const lastCompletion = new Date(task.lastCompletedAt);
+                                  const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                                  const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+                                  
+                                  if (hoursRemaining > 0) {
+                                    const hours = Math.floor(hoursRemaining);
+                                    const minutes = Math.floor((hoursRemaining - hours) * 60);
+                                    const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
                                     
-                                    const now = new Date();
-                                    const lastCompletion = new Date(task.lastCompletedAt);
-                                    const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-                                    const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-                                    
-                                    console.log('[DEBUG] Countdown calculation:', {
-                                      now: now.toISOString(),
-                                      lastCompletion: lastCompletion.toISOString(),
-                                      timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-                                      hoursRemaining
-                                    });
-                                    
-                                    if (hoursRemaining > 0) {
-                                      const hours = Math.floor(hoursRemaining);
-                                      const minutes = Math.floor((hoursRemaining - hours) * 60);
-                                      const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-                                      displayCountdown = { hours, minutes, seconds };
-                                      console.log('[DEBUG] Set fallback countdown:', displayCountdown);
-                                    } else {
-                                      console.log('[DEBUG] Hours remaining not positive:', hoursRemaining);
-                                    }
-                                  }
-                                  
-                                  console.log('[DEBUG] Final displayCountdown:', displayCountdown);
-                                  
-                                  return displayCountdown ? (
-                                <>
-                                  {/* Debug Info */}
-                                  {process.env.NODE_ENV === 'development' && (
-                                    <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-                                      <p>DEBUG: displayCountdown = {JSON.stringify(displayCountdown)}</p>
-                                      <p>DEBUG: countdown state = {JSON.stringify(countdown)}</p>
-                                      <p>DEBUG: task.lastCompletedAt = {task.lastCompletedAt ? new Date(task.lastCompletedAt).toISOString() : 'null'}</p>
-                                    </div>
-                                  )}
-                                  
-                                  <div className="text-center space-y-3">
-                                  <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">⏰ Task Locked - Countdown Active</span>
-                                  </div>
-                                  
-                                  {/* Enhanced Countdown Display */}
-                                  <div className={`p-4 rounded-lg border transition-all duration-500 ${
-                                    countdown.hours === 0 && countdown.minutes <= 5 
-                                      ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
-                                      : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800'
-                                  }`}>
-                                    <div className="text-center">
-                                      <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                        {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}:{countdown.seconds.toString().padStart(2, '0')}
-                                      </div>
-                                      <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                        Hours : Minutes : Seconds Remaining
-                                      </div>
-                                      {countdown.hours === 0 && countdown.minutes <= 5 && (
-                                        <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
-                                          ⚡ Almost ready! Get prepared for next task cycle!
+                                    return (
+                                      <div className="text-center space-y-3">
+                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                          <Clock className="h-4 w-4" />
+                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
                                         </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Progress Bar for Visual Feedback */}
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                      <span>Time Remaining</span>
-                                      <span>{Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100)}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                        style={{ 
-                                          width: `${Math.max(0, Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100))}%` 
-                                        }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="text-center">
-                                    <p className="text-xs text-muted-foreground">
-                                      🔒 Complete 5 actions again after countdown expires
-                                    </p>
-                                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                      Next task cycle will be available soon!
-                                    </p>
-                                  </div>
-                                </div>
-                                  </>
-                                  ) : (
-                                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
-                                      <p className="text-sm text-muted-foreground">
-                                        ⏳ Calculating countdown...
-                                      </p>
-                                    </div>
-                                  );
+                                        
+                                        {/* Enhanced Countdown Display */}
+                                        <div className={`p-4 rounded-lg border transition-all duration-500 ${
+                                          hours === 0 && minutes <= 5 
+                                            ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
+                                            : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800'
+                                        }`}>
+                                          <div className="text-center">
+                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                              {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                                            </div>
+                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                              Hours : Minutes : Seconds Remaining
+                                            </div>
+                                            {hours === 0 && minutes <= 5 && (
+                                              <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
+                                                ⚡ Almost ready! Get prepared for next task cycle!
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Progress Bar for Visual Feedback */}
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Time Remaining</span>
+                                            <span>{Math.round((hours * 60 + minutes) / 24 / 60 * 100)}%</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div 
+                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
+                                              style={{ 
+                                                width: `${Math.max(0, Math.round((hours * 60 + minutes) / 24 / 60 * 100))}%` 
+                                              }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">
+                                            🔒 Complete 5 actions again after countdown expires
+                                          </p>
+                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                            Next task cycle will be available soon!
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  } else {
+                                    return (
+                                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border">
+                                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                          ✅ Task ready! You can now complete 5 actions again.
+                                        </p>
+                                      </div>
+                                    );
+                                  }
                                 })()
                               ) : status?.canComplete ? (
                                 /* PRIORITY 2: Show complete button if task can be completed */
