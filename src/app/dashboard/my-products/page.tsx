@@ -1048,24 +1048,25 @@ export default function MyProductsPage() {
                               {/* PRIORITY 1: Show countdown if task is locked (completedActions === 5 and has lastCompletedAt) */}
                               {task.completedActions === 5 && task.lastCompletedAt ? (
                                 (() => {
-                                  // Calculate countdown on-the-fly
-                                  const now = new Date();
-                                  const lastCompletion = new Date(task.lastCompletedAt);
-                                  const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-                                  const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-                                  
-                                  // Add debug info to see what's happening
-                                  console.log(`[COUNTDOWN DEBUG] ${task.productName}:`, {
-                                    now: now.toISOString(),
-                                    lastCompletion: lastCompletion.toISOString(),
-                                    timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-                                    hoursRemaining,
-                                    completedActions: task.completedActions,
-                                    hasLastCompletedAt: !!task.lastCompletedAt
-                                  });
-                                  
-                                  // Check if task was just completed (within last 5 minutes)
-                                  const justCompleted = timeSinceLastCompletion < 5 * 60 * 1000; // 5 minutes in milliseconds
+                                  try {
+                                    // Calculate countdown on-the-fly
+                                    const now = new Date();
+                                    const lastCompletion = new Date(task.lastCompletedAt);
+                                    const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                                    const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+                                    
+                                    // Add debug info to see what's happening
+                                    console.log(`[COUNTDOWN DEBUG] ${task.productName}:`, {
+                                      now: now.toISOString(),
+                                      lastCompletion: lastCompletion.toISOString(),
+                                      timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+                                      hoursRemaining,
+                                      completedActions: task.completedActions,
+                                      hasLastCompletedAt: !!task.lastCompletedAt
+                                    });
+                                    
+                                    // Check if task was just completed (within last 5 minutes)
+                                    const justCompleted = timeSinceLastCompletion < 5 * 60 * 1000; // 5 minutes in milliseconds
                                   
                                   if (justCompleted) {
                                     // Task was just completed, show countdown starting from 24 hours
@@ -1177,6 +1178,16 @@ export default function MyProductsPage() {
                                       <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border">
                                         <p className="text-sm text-green-600 dark:text-green-400 font-medium">
                                           ✅ Task ready! You can now complete 5 actions again.
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  } catch (error) {
+                                    console.error('[COUNTDOWN ERROR] Failed to calculate countdown:', error);
+                                    return (
+                                      <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border">
+                                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                          ⚠️ Error calculating countdown. Please refresh the page.
                                         </p>
                                       </div>
                                     );
