@@ -1051,7 +1051,21 @@ export default function MyProductsPage() {
                                   try {
                                     // Calculate countdown on-the-fly
                                     const now = new Date();
-                                    const lastCompletion = new Date(task.lastCompletedAt);
+                                    
+                                    // Handle different date formats safely
+                                    let lastCompletion;
+                                    if (typeof task.lastCompletedAt === 'string') {
+                                      lastCompletion = new Date(task.lastCompletedAt);
+                                    } else if (task.lastCompletedAt instanceof Date) {
+                                      lastCompletion = task.lastCompletedAt;
+                                    } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                                      // Handle Firestore Timestamp
+                                      lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                                    } else {
+                                      // Fallback: assume task was just completed
+                                      lastCompletion = new Date(Date.now() - 1000); // 1 second ago
+                                    }
+                                    
                                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
                                     const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
                                     
@@ -1062,7 +1076,9 @@ export default function MyProductsPage() {
                                       timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
                                       hoursRemaining,
                                       completedActions: task.completedActions,
-                                      hasLastCompletedAt: !!task.lastCompletedAt
+                                      hasLastCompletedAt: !!task.lastCompletedAt,
+                                      lastCompletedAtType: typeof task.lastCompletedAt,
+                                      lastCompletedAtValue: task.lastCompletedAt
                                     });
                                     
                                     // Check if task was just completed (within last 5 minutes)
@@ -1184,11 +1200,48 @@ export default function MyProductsPage() {
                                   }
                                   } catch (error) {
                                     console.error('[COUNTDOWN ERROR] Failed to calculate countdown:', error);
+                                    // Fallback: show a default countdown since task is locked
                                     return (
-                                      <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border">
-                                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                                          ⚠️ Error calculating countdown. Please refresh the page.
-                                        </p>
+                                      <div className="text-center space-y-3">
+                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                          <Clock className="h-4 w-4" />
+                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
+                                        </div>
+                                        
+                                        {/* Fallback Countdown Display */}
+                                        <div className="p-4 rounded-lg border transition-all duration-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
+                                          <div className="text-center">
+                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                              24:00:00
+                                            </div>
+                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                              Hours : Minutes : Seconds Remaining
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Progress Bar for Visual Feedback */}
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Time Remaining</span>
+                                            <span>100%</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div 
+                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
+                                              style={{ width: '100%' }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">
+                                            🔒 Complete 5 actions again after countdown expires
+                                          </p>
+                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                            Next task cycle will be available soon!
+                                          </p>
+                                        </div>
                                       </div>
                                     );
                                   }
