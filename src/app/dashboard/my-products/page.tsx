@@ -554,6 +554,24 @@ export default function MyProductsPage() {
     }
   };
 
+  // Helper function to calculate countdown for a task
+  const calculateTaskCountdown = (task: any) => {
+    if (task.completedActions === 5 && task.lastCompletedAt) {
+      const now = new Date();
+      const lastCompletion = new Date(task.lastCompletedAt);
+      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+      const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+      
+      if (hoursRemaining > 0) {
+        const hours = Math.floor(hoursRemaining);
+        const minutes = Math.floor((hoursRemaining - hours) * 60);
+        const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+        return { hours, minutes, seconds };
+      }
+    }
+    return null;
+  };
+
   const updateCountdowns = () => {
     const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
     
@@ -766,7 +784,7 @@ export default function MyProductsPage() {
             
             // Inform user about reward
             console.log(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
-          } else {
+      } else {
             console.log(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
           }
         }
@@ -1044,7 +1062,25 @@ export default function MyProductsPage() {
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
                               {/* PRIORITY 1: Show countdown if task is locked (completedActions === 5 and has lastCompletedAt) */}
-                              {task.completedActions === 5 && task.lastCompletedAt && countdown ? (
+                              {task.completedActions === 5 && task.lastCompletedAt ? (
+                                (() => {
+                                  // Calculate countdown if not available in state
+                                  let displayCountdown = countdown;
+                                  if (!displayCountdown && task.lastCompletedAt) {
+                                    const now = new Date();
+                                    const lastCompletion = new Date(task.lastCompletedAt);
+                                    const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                                    const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+                                    
+                                    if (hoursRemaining > 0) {
+                                      const hours = Math.floor(hoursRemaining);
+                                      const minutes = Math.floor((hoursRemaining - hours) * 60);
+                                      const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+                                      displayCountdown = { hours, minutes, seconds };
+                                    }
+                                  }
+                                  
+                                  return displayCountdown ? (
                                 <div className="text-center space-y-3">
                                   <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
                                     <Clock className="h-4 w-4" />
@@ -1097,6 +1133,14 @@ export default function MyProductsPage() {
                                     </p>
                                   </div>
                                 </div>
+                                  ) : (
+                                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
+                                      <p className="text-sm text-muted-foreground">
+                                        ⏳ Calculating countdown...
+                                      </p>
+                                    </div>
+                                  );
+                                })()
                               ) : status?.canComplete ? (
                                 /* PRIORITY 2: Show complete button if task can be completed */
                                 <Button 
