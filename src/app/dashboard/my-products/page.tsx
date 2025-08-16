@@ -184,7 +184,7 @@ export default function MyProductsPage() {
     return () => {
       unsubscribe();
     };
-  }, [user, productTasks]);
+  }, [user]);
 
   // Fallback: automatically stop loading after 15 seconds to prevent infinite loading
   useEffect(() => {
@@ -278,7 +278,7 @@ export default function MyProductsPage() {
     updateCountdowns();
     
     return () => clearInterval(interval);
-  }, [productTasks]);
+  }, []);
 
   // Manual countdown calculation for tasks that should be locked
   useEffect(() => {
@@ -319,7 +319,7 @@ export default function MyProductsPage() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [productTasks]);
+  }, []);
 
   const loadPurchasedProducts = async () => {
     if (!user) {
@@ -646,11 +646,11 @@ export default function MyProductsPage() {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-            
-            // Update task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+          
+          // Update task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
             // Show user-facing toast instead of console
             alert('Action completed!');
@@ -701,11 +701,11 @@ export default function MyProductsPage() {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
-            
-            // Update task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+          
+          // Update task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
             // CRITICAL: Update countdowns immediately after task completion
             // This ensures the timer shows up right away
@@ -1077,7 +1077,7 @@ export default function MyProductsPage() {
                               ) : (
                                 /* PRIORITY 3: Show status message if neither countdown nor completion is possible */
                                 <div className="text-center">
-                                  <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
                                 </div>
                               )}
                             </div>
