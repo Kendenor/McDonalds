@@ -1067,21 +1067,46 @@ export default function MyProductsPage() {
                                   // Calculate countdown if not available in state
                                   let displayCountdown = countdown;
                                   if (!displayCountdown && task.lastCompletedAt) {
+                                    console.log('[DEBUG] Calculating fallback countdown for task:', task.productName);
+                                    console.log('[DEBUG] lastCompletedAt:', task.lastCompletedAt);
+                                    
                                     const now = new Date();
                                     const lastCompletion = new Date(task.lastCompletedAt);
                                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
                                     const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+                                    
+                                    console.log('[DEBUG] Countdown calculation:', {
+                                      now: now.toISOString(),
+                                      lastCompletion: lastCompletion.toISOString(),
+                                      timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+                                      hoursRemaining
+                                    });
                                     
                                     if (hoursRemaining > 0) {
                                       const hours = Math.floor(hoursRemaining);
                                       const minutes = Math.floor((hoursRemaining - hours) * 60);
                                       const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
                                       displayCountdown = { hours, minutes, seconds };
+                                      console.log('[DEBUG] Set fallback countdown:', displayCountdown);
+                                    } else {
+                                      console.log('[DEBUG] Hours remaining not positive:', hoursRemaining);
                                     }
                                   }
                                   
+                                  console.log('[DEBUG] Final displayCountdown:', displayCountdown);
+                                  
                                   return displayCountdown ? (
-                                <div className="text-center space-y-3">
+                                <>
+                                  {/* Debug Info */}
+                                  {process.env.NODE_ENV === 'development' && (
+                                    <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+                                      <p>DEBUG: displayCountdown = {JSON.stringify(displayCountdown)}</p>
+                                      <p>DEBUG: countdown state = {JSON.stringify(countdown)}</p>
+                                      <p>DEBUG: task.lastCompletedAt = {task.lastCompletedAt ? new Date(task.lastCompletedAt).toISOString() : 'null'}</p>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="text-center space-y-3">
                                   <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
                                     <Clock className="h-4 w-4" />
                                     <span className="font-medium">⏰ Task Locked - Countdown Active</span>
@@ -1133,6 +1158,7 @@ export default function MyProductsPage() {
                                     </p>
                                   </div>
                                 </div>
+                                  </>
                                   ) : (
                                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
                                       <p className="text-sm text-muted-foreground">
