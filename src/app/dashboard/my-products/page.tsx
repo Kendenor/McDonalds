@@ -1054,7 +1054,66 @@ export default function MyProductsPage() {
                                   const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
                                   const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
                                   
-                                  if (hoursRemaining > 0) {
+                                  // Add debug info to see what's happening
+                                  console.log(`[COUNTDOWN DEBUG] ${task.productName}:`, {
+                                    now: now.toISOString(),
+                                    lastCompletion: lastCompletion.toISOString(),
+                                    timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+                                    hoursRemaining,
+                                    completedActions: task.completedActions,
+                                    hasLastCompletedAt: !!task.lastCompletedAt
+                                  });
+                                  
+                                  // Check if task was just completed (within last 5 minutes)
+                                  const justCompleted = timeSinceLastCompletion < 5 * 60 * 1000; // 5 minutes in milliseconds
+                                  
+                                  if (justCompleted) {
+                                    // Task was just completed, show countdown starting from 24 hours
+                                    return (
+                                      <div className="text-center space-y-3">
+                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                          <Clock className="h-4 w-4" />
+                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
+                                        </div>
+                                        
+                                        {/* Enhanced Countdown Display */}
+                                        <div className="p-4 rounded-lg border transition-all duration-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
+                                          <div className="text-center">
+                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                              24:00:00
+                                            </div>
+                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                              Hours : Minutes : Seconds Remaining
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Progress Bar for Visual Feedback */}
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Time Remaining</span>
+                                            <span>100%</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div 
+                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
+                                              style={{ width: '100%' }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">
+                                            🔒 Complete 5 actions again after countdown expires
+                                          </p>
+                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                            Next task cycle will be available soon!
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  } else if (hoursRemaining > 0) {
+                                    // Normal countdown calculation
                                     const hours = Math.floor(hoursRemaining);
                                     const minutes = Math.floor((hoursRemaining - hours) * 60);
                                     const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
