@@ -93,6 +93,7 @@ export default function MyProductsPage() {
   const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number; seconds: number }>>(new Map());
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
   const [completingActions, setCompletingActions] = useState<Map<string, Set<string>>>(new Map());
+  const [taskMessage, setTaskMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -652,21 +653,24 @@ export default function MyProductsPage() {
           const status = await productTaskService.canCompleteProductTask(user.uid, productId);
           setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             
-            // Show user-facing toast instead of console
-            alert('Action completed!');
+            // Show user-facing message in console
+            console.log('Action completed successfully!');
           } else {
-            alert('Action completed!');
+            console.log('Action completed successfully!');
           }
         }
         
-        // Show success message
-        alert(result.message);
+        // Show success message to user
+        setTaskMessage({ type: 'success', message: result.message });
+        setTimeout(() => setTaskMessage(null), 3000); // Clear after 3 seconds
       } else {
-        alert(result.message);
+        // Show error message to user
+        setTaskMessage({ type: 'error', message: result.message });
+        setTimeout(() => setTaskMessage(null), 3000); // Clear after 3 seconds
       }
     } catch (error) {
       console.error('Failed to complete action:', error);
-      alert('Failed to complete action. Please try again.');
+      console.error('Action completion error. Please check console for details.');
     } finally {
       // Clear loading state for this action
       setCompletingActions(prev => {
@@ -761,20 +765,32 @@ export default function MyProductsPage() {
             }, 100);
             
             // Inform user about reward
-            alert(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
+            console.log(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
           } else {
-            alert(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
+            console.log(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
           }
         }
         
-        // Show success message
-        alert(result.message);
+        // Show success message to user
+        setTaskMessage({ type: 'success', message: result.message });
+        setTimeout(() => setTaskMessage(null), 5000); // Clear after 5 seconds
       } else {
-        alert(result.message);
+        // Show error message to user with debug info
+        const currentTask = productTasks.get(productId);
+        const debugInfo = currentTask ? 
+          ` (Actions: ${currentTask.completedActions}/${currentTask.requiredActions}, Last Completed: ${currentTask.lastCompletedAt ? new Date(currentTask.lastCompletedAt).toISOString() : 'Never'})` : 
+          '';
+        
+        setTaskMessage({ 
+          type: 'error', 
+          message: `${result.message}${debugInfo}` 
+        });
+        setTimeout(() => setTaskMessage(null), 8000); // Clear after 8 seconds for longer debug info
       }
     } catch (error) {
       console.error('Failed to complete task:', error);
-      alert('Failed to complete task. Please try again.');
+      // Show user-friendly error message
+      console.error('Task completion error. Please check console for details.');
     } finally {
       // Clear loading state
       setCompletingTasks(prev => {
@@ -873,6 +889,24 @@ export default function MyProductsPage() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Task Message Display */}
+      {taskMessage && (
+        <div className={`mb-4 p-4 rounded-lg border ${
+          taskMessage.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200' 
+            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            {taskMessage.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            )}
+            <span className="font-medium">{taskMessage.message}</span>
+          </div>
+        </div>
+      )}
+      
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">My Products</h1>
