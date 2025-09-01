@@ -24,65 +24,89 @@ function useSpecialPlanCountdown(task: any, productId: string) {
   } | null>(null);
 
   useEffect(() => {
-    if (!task || task.completedActions !== 5 || !task.lastCompletedAt) {
-      setCountdown(null);
-      return;
-    }
-
-    const updateCountdown = () => {
-      const now = new Date();
-      let lastCompletion: Date;
-
-      // Handle different date formats safely
-      if (typeof task.lastCompletedAt === 'string') {
-        lastCompletion = new Date(task.lastCompletedAt);
-      } else if (task.lastCompletedAt instanceof Date) {
-        lastCompletion = task.lastCompletedAt;
-      } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-        // Handle Firestore Timestamp
-        lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-      } else {
+    try {
+      // Validate task data before proceeding
+      if (!task || !productId || typeof productId !== 'string') {
+        console.log('[COUNTDOWN] Invalid task or productId:', { task, productId });
+        setCountdown(null);
         return;
       }
 
-      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-      const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-
-      if (hoursRemaining <= 0) {
-        // Countdown expired, reset the task
-        setCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
-        
-        // Auto-reset the task in the background
-        const resetTask = async () => {
-          try {
-            if (!auth.currentUser?.uid) {
-              console.log('[COUNTDOWN] No user logged in, skipping auto-reset');
-              return;
-            }
-            const taskService = new ProductTaskService();
-            await taskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
-            console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
-          } catch (error) {
-            console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
-          }
-        };
-        resetTask();
-      } else {
-        const hours = Math.floor(hoursRemaining);
-        const minutes = Math.floor((hoursRemaining - hours) * 60);
-        const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-        
-        setCountdown({ hours, minutes, seconds, isExpired: false });
+      if (task.completedActions !== 5 || !task.lastCompletedAt) {
+        setCountdown(null);
+        return;
       }
-    };
 
-    // Update countdown immediately
-    updateCountdown();
+      const updateCountdown = () => {
+        try {
+          const now = new Date();
+          let lastCompletion: Date;
 
-    // Update countdown every second
-    const interval = setInterval(updateCountdown, 1000);
+          // Handle different date formats safely
+          if (typeof task.lastCompletedAt === 'string') {
+            lastCompletion = new Date(task.lastCompletedAt);
+          } else if (task.lastCompletedAt instanceof Date) {
+            lastCompletion = task.lastCompletedAt;
+          } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+            // Handle Firestore Timestamp
+            lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+          } else {
+            console.log('[COUNTDOWN] Invalid lastCompletedAt format:', task.lastCompletedAt);
+            return;
+          }
 
-    return () => clearInterval(interval);
+          // Validate the date
+          if (isNaN(lastCompletion.getTime())) {
+            console.log('[COUNTDOWN] Invalid date:', lastCompletion);
+            return;
+          }
+
+          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+
+          if (hoursRemaining <= 0) {
+            // Countdown expired, reset the task
+            setCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
+            
+            // Auto-reset the task in the background
+            const resetTask = async () => {
+              try {
+                if (!auth.currentUser?.uid) {
+                  console.log('[COUNTDOWN] No user logged in, skipping auto-reset');
+                  return;
+                }
+                const taskService = new ProductTaskService();
+                await taskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
+                console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
+              } catch (error) {
+                console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
+              }
+            };
+            resetTask();
+          } else {
+            const hours = Math.floor(hoursRemaining);
+            const minutes = Math.floor((hoursRemaining - hours) * 60);
+            const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+            
+            setCountdown({ hours, minutes, seconds, isExpired: false });
+          }
+        } catch (error) {
+          console.error('[COUNTDOWN] Error in updateCountdown:', error);
+          setCountdown(null);
+        }
+      };
+
+      // Update countdown immediately
+      updateCountdown();
+
+      // Update countdown every second
+      const interval = setInterval(updateCountdown, 1000);
+
+      return () => clearInterval(interval);
+    } catch (error) {
+      console.error('[COUNTDOWN] Hook error:', error);
+      setCountdown(null);
+    }
   }, [task, productId]);
 
   return countdown;
@@ -170,15 +194,26 @@ export default function MyProductsPage() {
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
   const [completingActions, setCompletingActions] = useState<Map<string, Set<string>>>(new Map());
   const [taskMessage, setTaskMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        loadPurchasedProducts();
-      }
-    });
-    return () => unsubscribe();
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        try {
+          setUser(currentUser);
+          if (currentUser) {
+            loadPurchasedProducts();
+          }
+        } catch (error) {
+          console.error('[AUTH] Error in auth state change handler:', error);
+          setError('Authentication error occurred');
+        }
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('[AUTH] Error setting up auth listener:', error);
+      setError('Failed to initialize authentication');
+    }
   }, []);
 
   // Add real-time listener for products
@@ -474,64 +509,70 @@ export default function MyProductsPage() {
   const loadProductTasks = async (products: PurchasedProduct[], retryCount = 0) => {
     if (!user) return;
     
-    console.log('[PRODUCTS] Loading tasks for', products.length, 'products (attempt', retryCount + 1, ')');
-    
-    const tasksMap = new Map<string, ProductTask>();
-    const statusesMap = new Map<string, TaskStatus>();
-    const productTaskService = new ProductTaskService();
-    
-    for (const product of products) {
-      try {
-        console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
-        console.log(`[PRODUCTS] Product details:`, {
-          id: product.id,
-          name: product.name,
-          planType: product.planType,
-          status: product.status,
-          totalEarning: product.totalEarning,
-          cycleDays: product.cycleDays
-        });
+    try {
+      console.log('[PRODUCTS] Loading tasks for', products.length, 'products (attempt', retryCount + 1, ')');
+      
+      const tasksMap = new Map<string, ProductTask>();
+      const statusesMap = new Map<string, TaskStatus>();
+      const productTaskService = new ProductTaskService();
+      
+      for (const product of products) {
+        try {
+          if (!user?.uid) {
+            console.log('[PRODUCTS] User no longer logged in, stopping task loading');
+            break;
+          }
+          
+          console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
+          console.log(`[PRODUCTS] Product details:`, {
+            id: product.id,
+            name: product.name,
+            planType: product.planType,
+            status: product.status,
+            totalEarning: product.totalEarning,
+            cycleDays: product.cycleDays
+          });
 
-        let task = await productTaskService.getProductTask(user.uid, product.id);
-        
-        if (task) {
-          console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
-          tasksMap.set(product.id, task);
+          let task = await productTaskService.getProductTask(user.uid, product.id);
           
-          // Get task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-          statusesMap.set(product.id, status);
-          console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
-        } else {
-          console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
-          
-          // For Special plans, try to create the task if it doesn't exist
-          if (product.planType === 'Special') {
-            console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
-            console.log(`[PRODUCTS] Creating task with params:`, {
-              userId: user.uid,
-              productId: product.id,
-              productName: product.name,
-              totalReturn: product.totalEarning,
-              cycleDays: product.cycleDays
-            });
+          if (task) {
+            console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
+            tasksMap.set(product.id, task);
             
-            try {
-              const newTask = await productTaskService.createProductTask(
-                user.uid,
-                product.id,
-                product.name,
-                product.totalEarning,
-                product.cycleDays
-              );
-              console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
+            // Get task status
+            const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+            statusesMap.set(product.id, status);
+            console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
+          } else {
+            console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
+            
+            // For Special plans, try to create the task if it doesn't exist
+            if (product.planType === 'Special') {
+              console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
+              console.log(`[PRODUCTS] Creating task with params:`, {
+                userId: user.uid,
+                productId: product.id,
+                productName: product.name,
+                totalReturn: product.totalEarning,
+                cycleDays: product.cycleDays
+              });
               
-              if (newTask) {
-                tasksMap.set(product.id, newTask);
+              try {
+                const newTask = await productTaskService.createProductTask(
+                  user.uid,
+                  product.id,
+                  product.name,
+                  product.totalEarning,
+                  product.cycleDays
+                );
+                console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
                 
-                // Get task status for new task
-                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                statusesMap.set(product.id, status);
+                if (newTask) {
+                  tasksMap.set(product.id, newTask);
+                  
+                  // Get task status for new task
+                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                  statusesMap.set(product.id, status);
                 
                 console.log(`[PRODUCTS] Task created and status loaded for ${product.name}:`, status);
                 
@@ -606,7 +647,11 @@ export default function MyProductsPage() {
         console.error('[PRODUCTS] Failed to load tasks after 3 attempts');
       }
     }
-  };
+  } catch (error) {
+    console.error('[PRODUCTS] Failed to load product tasks:', error);
+    setError('Failed to load product tasks. Please try again.');
+  }
+};
 
 
 
@@ -1010,6 +1055,24 @@ export default function MyProductsPage() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <span className="font-medium">Error: {error}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setError(null)}
+              className="ml-auto"
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Task Message Display */}
       {taskMessage && (
         <div className={`mb-4 p-4 rounded-lg border ${
