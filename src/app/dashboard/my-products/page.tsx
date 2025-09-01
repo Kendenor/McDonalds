@@ -12,6 +12,7 @@ import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // Custom hook for real-time countdown and auto-reset
 function useSpecialPlanCountdown(task: any, productId: string) {
@@ -54,8 +55,12 @@ function useSpecialPlanCountdown(task: any, productId: string) {
         // Auto-reset the task in the background
         const resetTask = async () => {
           try {
+            if (!auth.currentUser?.uid) {
+              console.log('[COUNTDOWN] No user logged in, skipping auto-reset');
+              return;
+            }
             const taskService = new ProductTaskService();
-            await taskService.checkAndResetActionsAfterCooldown(auth.currentUser?.uid || '', productId);
+            await taskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
             console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
           } catch (error) {
             console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
@@ -154,6 +159,7 @@ const ACTION_ICONS = {
 };
 
 export default function MyProductsPage() {
+  const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [purchasedProducts, setPurchasedProducts] = useState<PurchasedProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,68 +279,87 @@ export default function MyProductsPage() {
   useEffect(() => {
     if (!user || purchasedProducts.length === 0) return;
     
-    const interval = setInterval(() => {
-      const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
-      if (specialPlans.length > 0) {
-        // Check if any Special plans are missing tasks
-        const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
-        if (missingTasks.length > 0) {
-          console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
-          
-          // Check for missing tasks in database, not just local state
-          missingTasks.forEach(async (product) => {
-            console.log(`[PRODUCTS] Auto-checking for missing task for ${product.name}`);
-            try {
-              const productTaskService = new ProductTaskService();
-              const existingTask = await productTaskService.getProductTask(user.uid, product.id);
+    let isMounted = true; // Track if component is still mounted
+    
+    const interval = setInterval(async () => {
+      if (!isMounted) return;
+      
+      try {
+        const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
+        if (specialPlans.length > 0) {
+          // Check if any Special plans are missing tasks
+          const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
+          if (missingTasks.length > 0) {
+            console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
+            
+            // Process missing tasks sequentially to avoid race conditions
+            for (const product of missingTasks) {
+              if (!isMounted) break; // Stop if component unmounted
               
-              if (existingTask) {
-                console.log(`[PRODUCTS] Auto-check found existing task for ${product.name}:`, existingTask);
+              try {
+                console.log(`[PRODUCTS] Auto-checking for missing task for ${product.name}`);
+                const productTaskService = new ProductTaskService();
+                const existingTask = await productTaskService.getProductTask(user.uid, product.id);
                 
-                // Update UI with existing task
-                setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
+                if (!isMounted) break; // Check again before updating state
                 
-                // Get and set task status
-                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
-                
-                console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
-              } else {
-                console.log(`[PRODUCTS] Auto-check: No existing task found, creating new one for ${product.name}`);
-                try {
-                  const newTask = await productTaskService.createProductTask(
-                    user.uid,
-                    product.id,
-                    product.name,
-                    product.totalEarning,
-                    product.cycleDays
-                  );
+                if (existingTask) {
+                  console.log(`[PRODUCTS] Auto-check found existing task for ${product.name}:`, existingTask);
                   
-                  if (newTask) {
-                    console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
-                    
-                    // Update UI immediately
-                    setProductTasks(prev => new Map(prev.set(product.id, newTask)));
-                    
-                    // Get and set task status
-                    const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                  // Update UI with existing task
+                  setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
+                  
+                  // Get and set task status
+                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                  if (isMounted) {
                     setTaskStatuses(prev => new Map(prev.set(product.id, status)));
-                    
                     console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
                   }
-                } catch (error) {
-                  console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
+                } else {
+                  console.log(`[PRODUCTS] Auto-check: No existing task found, creating new one for ${product.name}`);
+                  try {
+                    const newTask = await productTaskService.createProductTask(
+                      user.uid,
+                      product.id,
+                      product.name,
+                      product.totalEarning,
+                      product.cycleDays
+                    );
+                    
+                    if (!isMounted) break; // Check again before updating state
+                    
+                    if (newTask) {
+                      console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
+                      
+                      // Update UI immediately
+                      setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                      
+                      // Get and set task status
+                      const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                      if (isMounted) {
+                        setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                        console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
+                      }
+                    }
+                  } catch (error) {
+                    console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
+                  }
                 }
+              } catch (error) {
+                console.error(`[PRODUCTS] Failed to auto-check task for ${product.name}:`, error);
               }
-            } catch (error) {
-              console.error(`[PRODUCTS] Failed to auto-check task for ${product.name}:`, error);
             }
-          });
+          }
         }
+      } catch (error) {
+        console.error('[PRODUCTS] Auto-check error:', error);
       }
     }, 3000);
     
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [user, purchasedProducts, productTasks]);
 
   // Real-time countdown timer - update every second for better UX
