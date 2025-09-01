@@ -65,7 +65,18 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<AppSettings>({
     telegramLink: '',
     whatsappLink: '',
-    infoItems: [],
+    infoItems: [
+      { text: "Profit drops every 24 hours" },
+      { text: "Level 1 - 24% Level 2 - 3% Level 3 - 2%" },
+      { text: "Withdrawal: 10am - 6pm daily" },
+      { text: "Deposit: 24/7" },
+      { text: "Daily Login bonus: ₦50" },
+      { text: "Welcome bonus: ₦550" },
+      { text: "Minimum deposit: ₦3,000" },
+      { text: "Withdrawal charge: 15%" },
+      { text: "Minimum withdrawal: ₦1,000" },
+      { text: "Join our Support group for updates" }
+    ],
     bankAccounts: [],
     minDeposit: 3000,
     maxDeposit: 500000,
@@ -174,6 +185,30 @@ export default function AdminSettingsPage() {
         ...prev.popupContent,
         [field]: value
       }
+    }));
+  };
+
+  // Info items management functions
+  const handleInfoItemChange = (index: number, value: string) => {
+    setSettings(prev => ({
+      ...prev,
+      infoItems: prev.infoItems.map((item, i) => 
+        i === index ? { text: value } : item
+      )
+    }));
+  };
+
+  const handleAddInfoItem = () => {
+    setSettings(prev => ({
+      ...prev,
+      infoItems: [...prev.infoItems, { text: '' }]
+    }));
+  };
+
+  const handleRemoveInfoItem = (index: number) => {
+    setSettings(prev => ({
+      ...prev,
+      infoItems: prev.infoItems.filter((_, i) => i !== index)
     }));
   };
 
@@ -454,6 +489,48 @@ export default function AdminSettingsPage() {
             </TabsContent>
 
             <TabsContent value="popups" className="space-y-6">
+              {/* Info Items (Home Page Popup Content) */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Home Page Info Items
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Edit the information items that appear on the home page popup (rules, bonuses, etc.).
+                </p>
+
+                <div className="space-y-4">
+                  {settings.infoItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Textarea
+                        value={item.text}
+                        onChange={(e) => handleInfoItemChange(index, e.target.value)}
+                        placeholder="Enter info item text"
+                        rows={2}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveInfoItem(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleAddInfoItem}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Info Item
+                  </Button>
+                </div>
+              </div>
+
               {/* Popup Content */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
