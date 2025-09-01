@@ -656,11 +656,12 @@ export default function MyProductsPage() {
 
 
   const updateCountdowns = () => {
-    const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
-    
-    console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
-    
-    productTasks.forEach((task, productId) => {
+    try {
+      const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
+      
+      console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
+      
+      productTasks.forEach((task, productId) => {
       console.log(`[COUNTDOWN] Checking task for ${task.productName}:`, {
         completedActions: task.completedActions,
         lastCompletedAt: task.lastCompletedAt,
@@ -682,6 +683,16 @@ export default function MyProductsPage() {
           lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
         } else {
           console.log(`[COUNTDOWN] Invalid lastCompletedAt format for ${task.productName}:`, task.lastCompletedAt);
+          return;
+        }
+        
+        // Validate the date before using it
+        if (isNaN(lastCompletion.getTime())) {
+          console.log(`[COUNTDOWN] Invalid date created for ${task.productName}:`, {
+            lastCompletedAt: task.lastCompletedAt,
+            lastCompletion: lastCompletion,
+            lastCompletedAtType: typeof task.lastCompletedAt
+          });
           return;
         }
         
@@ -717,21 +728,36 @@ export default function MyProductsPage() {
       
       // Also check nextAvailableTime for legacy support
       if (task.nextAvailableTime) {
-        const now = new Date();
-        const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
-        
-        if (timeRemaining > 0) {
-          const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-          const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-          countdownsMap.set(productId, { hours, minutes, seconds });
-          console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
+        try {
+          const now = new Date();
+          
+          // Validate nextAvailableTime before using it
+          if (isNaN(task.nextAvailableTime.getTime())) {
+            console.log(`[COUNTDOWN] Invalid nextAvailableTime for ${task.productName}:`, task.nextAvailableTime);
+            return;
+          }
+          
+          const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
+          
+          if (timeRemaining > 0) {
+            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+            countdownsMap.set(productId, { hours, minutes, seconds });
+            console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
+          }
+        } catch (error) {
+          console.error(`[COUNTDOWN] Error processing nextAvailableTime for ${task.productName}:`, error);
         }
       }
-    });
-    
-    console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
-    setCountdowns(countdownsMap);
+      });
+      
+      console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
+      setCountdowns(countdownsMap);
+    } catch (error) {
+      console.error('[COUNTDOWN] Error updating countdowns:', error);
+      // Don't set error state here as it's not critical for the main functionality
+    }
   };
 
   const handleCompleteAction = async (productId: string, actionType: string) => {
