@@ -437,6 +437,11 @@ export default function MyProductsPage() {
       try {
         await loadProductTasks(products);
         
+        // Initialize countdowns after tasks are loaded
+        setTimeout(() => {
+          updateCountdowns();
+        }, 100);
+        
         // Additional immediate task creation for Special plans
         const specialPlans = products.filter(p => p.planType === 'Special');
         if (specialPlans.length > 0) {
@@ -480,6 +485,11 @@ export default function MyProductsPage() {
                     setTaskStatuses(prev => new Map(prev.set(product.id, status)));
                     
                     console.log(`[PRODUCTS] New task status set during initial load for ${product.name}:`, status);
+                    
+                    // Update countdowns after task creation
+                    setTimeout(() => {
+                      updateCountdowns();
+                    }, 100);
                   }
                 } catch (error) {
                   console.error(`[PRODUCTS] Failed to create task during initial load for ${product.name}:`, error);
@@ -711,13 +721,28 @@ export default function MyProductsPage() {
         });
         
         if (hoursRemaining > 0) {
-          const hours = Math.floor(hoursRemaining);
-          const minutes = Math.floor((hoursRemaining - hours) * 60);
-          const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+          const totalMinutes = Math.floor(hoursRemaining * 60);
+          const hours = Math.floor(totalMinutes / 60);
+          const minutes = totalMinutes % 60;
+          const totalSeconds = Math.floor(hoursRemaining * 3600);
+          const seconds = totalSeconds % 60;
+          
           countdownsMap.set(productId, { hours, minutes, seconds });
-          console.log(`[COUNTDOWN] Set countdown for ${task.productName}:`, { hours, minutes, seconds });
+          console.log(`[COUNTDOWN] Set countdown for ${task.productName}:`, { 
+            hours, 
+            minutes, 
+            seconds,
+            hoursRemaining,
+            totalMinutes,
+            totalSeconds
+          });
         } else {
           console.log(`[COUNTDOWN] Hours remaining is not positive for ${task.productName}: ${hoursRemaining}`);
+          // Clear countdown when time has expired
+          if (countdownsMap.has(productId)) {
+            countdownsMap.delete(productId);
+            console.log(`[COUNTDOWN] Cleared expired countdown for ${task.productName}`);
+          }
         }
       } else {
         console.log(`[COUNTDOWN] Task not locked for ${task.productName}:`, {
@@ -743,8 +768,12 @@ export default function MyProductsPage() {
             const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
             const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-            countdownsMap.set(productId, { hours, minutes, seconds });
-            console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
+            
+            // Only set countdown if we don't already have one from lastCompletedAt
+            if (!countdownsMap.has(productId)) {
+              countdownsMap.set(productId, { hours, minutes, seconds });
+              console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
+            }
           }
         } catch (error) {
           console.error(`[COUNTDOWN] Error processing nextAvailableTime for ${task.productName}:`, error);
