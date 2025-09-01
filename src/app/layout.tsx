@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Chatbot } from "@/components/ui/chatbot";
+import { NotificationBanner } from "@/components/notification-banner";
 
 export const metadata: Metadata = {
   title: 'McDonald',
@@ -21,6 +22,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
+        <NotificationBanner />
         {children}
         <Toaster />
         <Chatbot />

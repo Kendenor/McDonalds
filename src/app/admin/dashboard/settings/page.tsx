@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Save, Loader, Cog, MessageSquare, Bell, Users, Info, DollarSign, ArrowDownUp } from 'lucide-react';
+import { Settings, Save, Loader, Cog, MessageSquare, Bell, Users, Info, DollarSign, ArrowDownUp, Plus, Edit, Trash2, Landmark } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SettingsService } from '@/lib/firebase-service';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -31,6 +32,14 @@ interface AppSettings {
     withdrawalSuccessMessage?: string;
     referralBonusMessage?: string;
     dailyLoginMessage?: string;
+  };
+  // Add notification banner settings
+  notificationBanner: {
+    enabled: boolean;
+    message: string;
+    backgroundColor: string;
+    textColor: string;
+    showOnAllPages: boolean;
   };
   updatedAt?: any;
 }
@@ -57,7 +66,23 @@ export default function AdminSettingsPage() {
       withdrawalSuccessMessage: 'Withdrawal request submitted successfully!',
       referralBonusMessage: 'Referral bonus received! Your earnings have been updated.',
       dailyLoginMessage: 'Daily login bonus of ₦50 has been added to your account!'
+    },
+    notificationBanner: {
+      enabled: false,
+      message: 'Welcome to McDonald Investment!',
+      backgroundColor: '#3b82f6',
+      textColor: '#ffffff',
+      showOnAllPages: true
     }
+  });
+
+  // Bank account management state
+  const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
+  const [editingBankAccount, setEditingBankAccount] = useState<any>(null);
+  const [newBankAccount, setNewBankAccount] = useState({
+    bankName: '',
+    accountNumber: '',
+    accountName: ''
   });
 
     useEffect(() => {
@@ -80,6 +105,13 @@ export default function AdminSettingsPage() {
         popupContent: {
           ...settings.popupContent,
           ...currentSettings.popupContent
+        },
+        notificationBanner: {
+          enabled: currentSettings.notificationBanner?.enabled || false,
+          message: currentSettings.notificationBanner?.message || 'Welcome to McDonald Investment!',
+          backgroundColor: currentSettings.notificationBanner?.backgroundColor || '#3b82f6',
+          textColor: currentSettings.notificationBanner?.textColor || '#ffffff',
+          showOnAllPages: currentSettings.notificationBanner?.showOnAllPages || true
         }
       });
             } catch (error) {
@@ -122,6 +154,59 @@ export default function AdminSettingsPage() {
         [field]: value
       }
     }));
+  };
+
+  // Bank account management functions
+  const handleAddBankAccount = () => {
+    if (!newBankAccount.bankName || !newBankAccount.accountNumber || !newBankAccount.accountName) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill in all fields.' });
+      return;
+    }
+
+    const account = {
+      id: Date.now().toString(),
+      ...newBankAccount
+    };
+
+    setSettings(prev => ({
+      ...prev,
+      bankAccounts: [...prev.bankAccounts, account]
+    }));
+
+    setNewBankAccount({ bankName: '', accountNumber: '', accountName: '' });
+    setIsBankAccountDialogOpen(false);
+    toast({ title: 'Success', description: 'Bank account added successfully.' });
+  };
+
+  const handleEditBankAccount = () => {
+    if (!editingBankAccount || !editingBankAccount.bankName || !editingBankAccount.accountNumber || !editingBankAccount.accountName) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill in all fields.' });
+      return;
+    }
+
+    setSettings(prev => ({
+      ...prev,
+      bankAccounts: prev.bankAccounts.map(account => 
+        account.id === editingBankAccount.id ? editingBankAccount : account
+      )
+    }));
+
+    setEditingBankAccount(null);
+    setIsBankAccountDialogOpen(false);
+    toast({ title: 'Success', description: 'Bank account updated successfully.' });
+  };
+
+  const handleDeleteBankAccount = (accountId: string) => {
+    setSettings(prev => ({
+      ...prev,
+      bankAccounts: prev.bankAccounts.filter(account => account.id !== accountId)
+    }));
+    toast({ title: 'Success', description: 'Bank account deleted successfully.' });
+  };
+
+  const openEditBankAccount = (account: any) => {
+    setEditingBankAccount({ ...account });
+    setIsBankAccountDialogOpen(true);
   };
 
   if (isLoading) {
@@ -254,10 +339,12 @@ export default function AdminSettingsPage() {
           </DialogHeader>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="limits">Limits</TabsTrigger>
               <TabsTrigger value="socials">Social Links</TabsTrigger>
               <TabsTrigger value="popups">Popup Content</TabsTrigger>
+              <TabsTrigger value="notification">Notification Banner</TabsTrigger>
+              <TabsTrigger value="bankaccounts">Bank Accounts</TabsTrigger>
             </TabsList>
 
             <TabsContent value="limits" className="space-y-6">
@@ -423,6 +510,180 @@ export default function AdminSettingsPage() {
                         </div>
                     </div>
             </TabsContent>
+
+            <TabsContent value="notification" className="space-y-6">
+              {/* Notification Banner Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Notification Banner Settings
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure the notification banner that appears at the top of the website.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="bannerEnabled"
+                      checked={settings.notificationBanner?.enabled || false}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        notificationBanner: {
+                          enabled: e.target.checked,
+                          message: prev.notificationBanner?.message || 'Welcome to McDonald Investment!',
+                          backgroundColor: prev.notificationBanner?.backgroundColor || '#3b82f6',
+                          textColor: prev.notificationBanner?.textColor || '#ffffff',
+                          showOnAllPages: prev.notificationBanner?.showOnAllPages || true
+                        }
+                      }))}
+                      className="rounded"
+                    />
+                    <Label htmlFor="bannerEnabled">Enable Notification Banner</Label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bannerMessage">Banner Message</Label>
+                    <Textarea
+                      id="bannerMessage"
+                      value={settings.notificationBanner?.message || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        notificationBanner: {
+                          ...prev.notificationBanner,
+                          message: e.target.value
+                        }
+                      }))}
+                      placeholder="Enter the message to display in the banner"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bannerBackgroundColor">Background Color</Label>
+                      <Input
+                        id="bannerBackgroundColor"
+                        type="color"
+                        value={settings.notificationBanner?.backgroundColor || '#3b82f6'}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          notificationBanner: {
+                            ...prev.notificationBanner,
+                            backgroundColor: e.target.value
+                          }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bannerTextColor">Text Color</Label>
+                      <Input
+                        id="bannerTextColor"
+                        type="color"
+                        value={settings.notificationBanner?.textColor || '#ffffff'}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          notificationBanner: {
+                            ...prev.notificationBanner,
+                            textColor: e.target.value
+                          }
+                        }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="bannerShowOnAllPages"
+                      checked={settings.notificationBanner?.showOnAllPages || false}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        notificationBanner: {
+                          ...prev.notificationBanner,
+                          showOnAllPages: e.target.checked
+                        }
+                      }))}
+                      className="rounded"
+                    />
+                    <Label htmlFor="bannerShowOnAllPages">Show on all pages</Label>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="bankaccounts" className="space-y-6">
+              {/* Bank Account Management */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Landmark className="h-4 w-4" />
+                    Bank Account Management
+                  </h3>
+                  <Button 
+                    onClick={() => {
+                      setNewBankAccount({ bankName: '', accountNumber: '', accountName: '' });
+                      setEditingBankAccount(null);
+                      setIsBankAccountDialogOpen(true);
+                    }}
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Account
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Manage bank accounts that users can deposit funds to.
+                </p>
+
+                {settings.bankAccounts.length > 0 ? (
+                  <div className="space-y-3">
+                    {settings.bankAccounts.map((account) => (
+                      <Card key={account.id} className="bg-card/50">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-2 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{account.bankName}</h4>
+                                <Badge variant="secondary">{account.accountNumber}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{account.accountName}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditBankAccount(account)}
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteBankAccount(account.id)}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-card/50 text-center">
+                    <CardContent className="p-8">
+                      <Landmark className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No bank accounts configured yet.</p>
+                      <p className="text-sm text-muted-foreground mt-2">Add your first bank account to enable deposits.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
           
           <div className="flex gap-2 pt-4">
@@ -451,6 +712,89 @@ export default function AdminSettingsPage() {
               Cancel
                         </Button>
                     </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Account Dialog */}
+      <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingBankAccount ? 'Edit Bank Account' : 'Add New Bank Account'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingBankAccount ? 'Update the bank account details.' : 'Add a new bank account for user deposits.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="bankName">Bank Name</Label>
+              <Input
+                id="bankName"
+                value={editingBankAccount ? editingBankAccount.bankName : newBankAccount.bankName}
+                onChange={(e) => {
+                  if (editingBankAccount) {
+                    setEditingBankAccount(prev => ({ ...prev, bankName: e.target.value }));
+                  } else {
+                    setNewBankAccount(prev => ({ ...prev, bankName: e.target.value }));
+                  }
+                }}
+                placeholder="e.g., First Bank, GT Bank"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="accountNumber">Account Number</Label>
+              <Input
+                id="accountNumber"
+                value={editingBankAccount ? editingBankAccount.accountNumber : newBankAccount.accountNumber}
+                onChange={(e) => {
+                  if (editingBankAccount) {
+                    setEditingBankAccount(prev => ({ ...prev, accountNumber: e.target.value }));
+                  } else {
+                    setNewBankAccount(prev => ({ ...prev, accountNumber: e.target.value }));
+                  }
+                }}
+                placeholder="e.g., 1234567890"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="accountName">Account Name</Label>
+              <Input
+                id="accountName"
+                value={editingBankAccount ? editingBankAccount.accountName : newBankAccount.accountName}
+                onChange={(e) => {
+                  if (editingBankAccount) {
+                    setEditingBankAccount(prev => ({ ...prev, accountName: e.target.value }));
+                  } else {
+                    setNewBankAccount(prev => ({ ...prev, accountName: e.target.value }));
+                  }
+                }}
+                placeholder="e.g., McDonald Investment Ltd"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2 pt-4">
+            <Button 
+              onClick={editingBankAccount ? handleEditBankAccount : handleAddBankAccount}
+              className="flex-1"
+            >
+              {editingBankAccount ? 'Update Account' : 'Add Account'}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsBankAccountDialogOpen(false);
+                setEditingBankAccount(null);
+                setNewBankAccount({ bankName: '', accountNumber: '', accountName: '' });
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
         </div>

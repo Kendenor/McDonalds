@@ -38,6 +38,14 @@ export interface AppSettings {
     referralBonusMessage?: string;
     dailyLoginMessage?: string;
   };
+  // Add notification banner settings
+  notificationBanner?: {
+    enabled: boolean;
+    message: string;
+    backgroundColor?: string;
+    textColor?: string;
+    showOnAllPages?: boolean;
+  };
   updatedAt?: any;
 }
 
@@ -80,6 +88,13 @@ export class SettingsService {
             withdrawalSuccessMessage: 'Withdrawal request submitted successfully!',
             referralBonusMessage: 'Referral bonus received! Your earnings have been updated.',
             dailyLoginMessage: 'Daily login bonus of ₦50 has been added to your account!'
+          },
+          notificationBanner: {
+            enabled: false,
+            message: 'Welcome to McDonald Investment!',
+            backgroundColor: '#3b82f6',
+            textColor: '#ffffff',
+            showOnAllPages: true
           }
         };
       }
@@ -99,6 +114,61 @@ export class SettingsService {
       });
     } catch (error) {
       console.error('Error saving settings:', error);
+      throw error;
+    }
+  }
+
+  // Add bank account to settings
+  static async addBankAccount(account: Omit<BankAccount, 'id' | 'createdAt'>): Promise<void> {
+    try {
+      const currentSettings = await this.getSettings();
+      const newAccount: BankAccount = {
+        ...account,
+        id: Date.now().toString(), // Simple ID generation
+        createdAt: new Date()
+      };
+      
+      const updatedBankAccounts = [...currentSettings.bankAccounts, newAccount];
+      await this.saveSettings({
+        ...currentSettings,
+        bankAccounts: updatedBankAccounts
+      });
+    } catch (error) {
+      console.error('Error adding bank account:', error);
+      throw error;
+    }
+  }
+
+  // Update bank account in settings
+  static async updateBankAccount(accountId: string, updates: Partial<BankAccount>): Promise<void> {
+    try {
+      const currentSettings = await this.getSettings();
+      const updatedBankAccounts = currentSettings.bankAccounts.map(account => 
+        account.id === accountId ? { ...account, ...updates } : account
+      );
+      
+      await this.saveSettings({
+        ...currentSettings,
+        bankAccounts: updatedBankAccounts
+      });
+    } catch (error) {
+      console.error('Error updating bank account:', error);
+      throw error;
+    }
+  }
+
+  // Delete bank account from settings
+  static async deleteBankAccount(accountId: string): Promise<void> {
+    try {
+      const currentSettings = await this.getSettings();
+      const updatedBankAccounts = currentSettings.bankAccounts.filter(account => account.id !== accountId);
+      
+      await this.saveSettings({
+        ...currentSettings,
+        bankAccounts: updatedBankAccounts
+      });
+    } catch (error) {
+      console.error('Error deleting bank account:', error);
       throw error;
     }
   }
@@ -136,6 +206,13 @@ export class SettingsService {
             withdrawalSuccessMessage: 'Withdrawal request submitted successfully!',
             referralBonusMessage: 'Referral bonus received! Your earnings have been updated.',
             dailyLoginMessage: 'Daily login bonus of ₦50 has been added to your account!'
+          },
+          notificationBanner: {
+            enabled: false,
+            message: 'Welcome to McDonald Investment!',
+            backgroundColor: '#3b82f6',
+            textColor: '#ffffff',
+            showOnAllPages: true
           }
         });
       }
