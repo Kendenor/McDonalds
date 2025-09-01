@@ -24,6 +24,16 @@ function useSpecialPlanCountdown(task: any, productId: string) {
   } | null>(null);
 
   useEffect(() => {
+    console.log('[COUNTDOWN-HOOK] Hook triggered for:', { 
+      productId, 
+      task: task ? { 
+        productName: task.productName, 
+        completedActions: task.completedActions, 
+        lastCompletedAt: task.lastCompletedAt,
+        lastCompletedAtType: typeof task.lastCompletedAt
+      } : null 
+    });
+    
     try {
       // Validate task data before proceeding
       if (!task || !productId || typeof productId !== 'string') {
@@ -33,23 +43,41 @@ function useSpecialPlanCountdown(task: any, productId: string) {
       }
 
       if (task.completedActions !== 5 || !task.lastCompletedAt) {
+        console.log('[COUNTDOWN] Task validation failed:', { 
+          completedActions: task.completedActions, 
+          hasLastCompletedAt: !!task.lastCompletedAt,
+          lastCompletedAt: task.lastCompletedAt
+        });
         setCountdown(null);
         return;
       }
+      
+      console.log('[COUNTDOWN-HOOK] Task validation passed, proceeding with countdown calculation');
 
       const updateCountdown = () => {
+        console.log('[COUNTDOWN-HOOK] updateCountdown function called');
         try {
           const now = new Date();
           let lastCompletion: Date;
 
           // Handle different date formats safely
+          console.log('[COUNTDOWN-HOOK] Parsing lastCompletedAt:', {
+            type: typeof task.lastCompletedAt,
+            value: task.lastCompletedAt,
+            isDate: task.lastCompletedAt instanceof Date,
+            hasSeconds: task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt
+          });
+          
           if (typeof task.lastCompletedAt === 'string') {
             lastCompletion = new Date(task.lastCompletedAt);
+            console.log('[COUNTDOWN-HOOK] Parsed as string:', lastCompletion);
           } else if (task.lastCompletedAt instanceof Date) {
             lastCompletion = task.lastCompletedAt;
+            console.log('[COUNTDOWN-HOOK] Already a Date:', lastCompletion);
           } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
             // Handle Firestore Timestamp
             lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+            console.log('[COUNTDOWN-HOOK] Parsed as Firestore Timestamp:', lastCompletion);
           } else {
             console.log('[COUNTDOWN] Invalid lastCompletedAt format:', task.lastCompletedAt);
             return;
