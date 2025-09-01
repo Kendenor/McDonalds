@@ -64,9 +64,18 @@ function useSpecialPlanCountdown(task: any, productId: string) {
           const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
           const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
 
+          console.log(`[COUNTDOWN-HOOK] ${task.productName}:`, {
+            lastCompletion: lastCompletion.toISOString(),
+            now: now.toISOString(),
+            timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
+            hoursRemaining,
+            timeSinceLastCompletionMs: timeSinceLastCompletion
+          });
+
           if (hoursRemaining <= 0) {
             // Countdown expired, reset the task
             setCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
+            console.log(`[COUNTDOWN-HOOK] Countdown expired for ${task.productName}`);
             
             // Auto-reset the task in the background
             const resetTask = async () => {
@@ -84,11 +93,14 @@ function useSpecialPlanCountdown(task: any, productId: string) {
             };
             resetTask();
           } else {
-            const hours = Math.floor(hoursRemaining);
-            const minutes = Math.floor((hoursRemaining - hours) * 60);
-            const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
+            const totalMinutes = Math.floor(hoursRemaining * 60);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const totalSeconds = Math.floor(hoursRemaining * 3600);
+            const seconds = totalSeconds % 60;
             
             setCountdown({ hours, minutes, seconds, isExpired: false });
+            console.log(`[COUNTDOWN-HOOK] Set countdown for ${task.productName}:`, { hours, minutes, seconds, hoursRemaining });
           }
         } catch (error) {
           console.error('[COUNTDOWN] Error in updateCountdown:', error);
@@ -110,7 +122,7 @@ function useSpecialPlanCountdown(task: any, productId: string) {
   }, [task, productId]);
 
   return countdown;
-}
+ }
 
 interface PurchasedProduct {
   id: string;
@@ -1273,6 +1285,14 @@ export default function MyProductsPage() {
                               <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
                               
                               {/* Countdown Display for Special Plans */}
+                              {/* Debug: Show countdown info */}
+                              <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
+                                <p>Debug: Task completedActions = {task.completedActions}</p>
+                                <p>Debug: Task lastCompletedAt = {task.lastCompletedAt ? 'exists' : 'null'}</p>
+                                <p>Debug: Countdown hook result = {countdown ? JSON.stringify(countdown) : 'null'}</p>
+                                <p>Debug: Should show countdown = {countdown && countdown.hours > 0 ? 'YES' : 'NO'}</p>
+                              </div>
+                              
                               {countdown && countdown.hours > 0 ? (
                                 <div className="text-center space-y-3">
                                   <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
@@ -1320,6 +1340,23 @@ export default function MyProductsPage() {
                                     <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                                       Next task cycle will be available soon!
                                     </p>
+                                  </div>
+                                  
+                                  {/* Debug Info */}
+                                  <div className="text-xs text-gray-500 border-t pt-2">
+                                    <p>Debug: lastCompletedAt = {task.lastCompletedAt ? new Date(task.lastCompletedAt).toISOString() : 'null'}</p>
+                                    <p>Debug: countdown = {JSON.stringify(countdown)}</p>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      onClick={() => {
+                                        console.log('[DEBUG] Task data:', task);
+                                        console.log('[DEBUG] Countdown data:', countdown);
+                                        updateCountdowns();
+                                      }}
+                                    >
+                                      Refresh Countdown
+                                    </Button>
                                   </div>
                                 </div>
                               ) : task.completedActions === 5 && task.lastCompletedAt ? (
