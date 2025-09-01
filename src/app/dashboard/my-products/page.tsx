@@ -709,22 +709,28 @@ export default function MyProductsPage() {
         const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
+        // If the task was just completed (within 5 seconds), it means the countdown should start from 24 hours
+        // If it's been more than 5 seconds, use the calculated time
+        const adjustedHoursRemaining = timeSinceLastCompletion < 5000 ? 24 : hoursRemaining;
+        
         console.log(`[COUNTDOWN] Task locked for ${task.productName}:`, {
           lastCompletion: lastCompletion.toISOString(),
           now: now.toISOString(),
           timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
           hoursRemaining,
+          adjustedHoursRemaining,
           completedActions: task.completedActions,
           hasLastCompletedAt: !!task.lastCompletedAt,
           lastCompletedAtType: typeof task.lastCompletedAt,
-          lastCompletedAtValue: task.lastCompletedAt
+          lastCompletedAtValue: task.lastCompletedAt,
+          timeSinceLastCompletionMs: timeSinceLastCompletion
         });
         
-        if (hoursRemaining > 0) {
-          const totalMinutes = Math.floor(hoursRemaining * 60);
+        if (adjustedHoursRemaining > 0) {
+          const totalMinutes = Math.floor(adjustedHoursRemaining * 60);
           const hours = Math.floor(totalMinutes / 60);
           const minutes = totalMinutes % 60;
-          const totalSeconds = Math.floor(hoursRemaining * 3600);
+          const totalSeconds = Math.floor(adjustedHoursRemaining * 3600);
           const seconds = totalSeconds % 60;
           
           countdownsMap.set(productId, { hours, minutes, seconds });
@@ -742,6 +748,26 @@ export default function MyProductsPage() {
           if (countdownsMap.has(productId)) {
             countdownsMap.delete(productId);
             console.log(`[COUNTDOWN] Cleared expired countdown for ${task.productName}`);
+          }
+          
+          // Auto-reset the task when countdown expires
+          if (user?.uid) {
+            console.log(`[COUNTDOWN] Auto-resetting task for ${task.productName} as countdown has expired`);
+            const resetTask = async () => {
+              try {
+                const productTaskService = new ProductTaskService();
+                await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+                console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
+                
+                // Refresh the task data
+                setTimeout(() => {
+                  loadProductTasks(purchasedProducts);
+                }, 1000);
+              } catch (error) {
+                console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
+              }
+            };
+            resetTask();
           }
         }
       } else {
