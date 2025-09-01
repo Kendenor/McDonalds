@@ -39,13 +39,7 @@ export default function AccountSettingsPage() {
     const [accountName, setAccountName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Profile settings
-    const [phone, setPhone] = useState('');
-    const [email, setEmail] = useState('');
-    
-    // Notification settings
-    const [emailNotifications, setEmailNotifications] = useState(true);
-    const [pushNotifications, setPushNotifications] = useState(true);
+
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -55,10 +49,7 @@ export default function AccountSettingsPage() {
                     const userData = await UserService.getUserById(currentUser.uid);
                     setUserData(userData);
                     
-                    if (userData) {
-                        setPhone(userData.phone || '');
-                        setEmail(userData.email || '');
-                    }
+
                     
                     // Load saved bank account
                     const savedAccount = localStorage.getItem(`bankAccount_${currentUser.uid}`);
@@ -112,18 +103,7 @@ export default function AccountSettingsPage() {
         }
     }
 
-    const handleProfileUpdate = async () => {
-        if (!user || !userData) return;
-        
-        try {
-            const updatedUser = { ...userData, phone, email };
-            await UserService.saveUser(updatedUser);
-            setUserData(updatedUser);
-            toast({ title: "Success", description: "Profile updated successfully." });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Error", description: "Failed to update profile." });
-        }
-    }
+
 
     if (isLoading) {
         return (
@@ -140,52 +120,13 @@ export default function AccountSettingsPage() {
                 <h1 className="text-2xl font-bold">Account Settings</h1>
             </div>
 
-            <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="profile">Profile</TabsTrigger>
+            <Tabs defaultValue="bank" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="bank">Bank Account</TabsTrigger>
-                    <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="profile">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <UserIcon className="h-5 w-5" />
-                                Profile Information
-                            </CardTitle>
-                            <CardDescription>
-                                Update your personal information and contact details.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email Address</Label>
-                                <Input 
-                                    id="email" 
-                                    type="email" 
-                                    value={email} 
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="your@email.com"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Phone Number</Label>
-                                <Input 
-                                    id="phone" 
-                                    type="tel" 
-                                    value={phone} 
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    placeholder="+2348012345678"
-                                />
-                            </div>
-                            <Button onClick={handleProfileUpdate} className="w-full">
-                                Update Profile
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+
 
                 <TabsContent value="bank">
                     <Card>
@@ -241,47 +182,7 @@ export default function AccountSettingsPage() {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="notifications">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Bell className="h-5 w-5" />
-                                Notification Settings
-                            </CardTitle>
-                            <CardDescription>
-                                Manage your notification preferences.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label htmlFor="email-notifications">Email Notifications</Label>
-                                    <p className="text-sm text-muted-foreground">Receive notifications via email</p>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    id="email-notifications"
-                                    checked={emailNotifications}
-                                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                                    className="h-4 w-4"
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label htmlFor="push-notifications">Push Notifications</Label>
-                                    <p className="text-sm text-muted-foreground">Receive push notifications</p>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    id="push-notifications"
-                                    checked={pushNotifications}
-                                    onChange={(e) => setPushNotifications(e.target.checked)}
-                                    className="h-4 w-4"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+
 
                 <TabsContent value="security">
                     <Card>

@@ -146,6 +146,7 @@ export default function MinePage() {
         <h2 className="text-lg font-semibold mb-4">Account Management</h2>
         <div className="space-y-3">
             <AccountMenuItem icon={<Folder size={24}/>} label="My Products" href="/dashboard/my-products" />
+            <AccountMenuItem icon={<Megaphone size={24}/>} label="Announcement" href="/dashboard/announcements" />
             <AccountMenuItem icon={<List size={24}/>} label="Funding Records" href="/dashboard/funding-records" />
             <AccountMenuItem icon={<Users size={24}/>} label="My Referrals" href="/dashboard/my-referrals" />
             <AccountMenuItem icon={<Landmark size={24}/>} label="Bank" href="/dashboard/add-account" />
