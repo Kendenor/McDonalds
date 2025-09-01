@@ -852,14 +852,63 @@ export default function MyProductsPage() {
     if (!user) return;
 
     try {
-      const result = await ProductService.claimReturns(user.uid, productId);
+      // Find the product to determine its type
+      const product = purchasedProducts.find(p => p.id === productId);
+      if (!product) {
+        alert('Product not found');
+        return;
+      }
 
-      if (result.success) {
-        alert(result.message);
-        // Refresh the product list to show updated status
-        loadPurchasedProducts();
+      if (product.planType === 'Special') {
+        // For Special plans, check if task is completed and claim daily reward
+        const task = productTasks.get(productId);
+        if (!task) {
+          alert('Task not found for this Special plan');
+          return;
+        }
+
+        if (task.completedActions < task.requiredActions) {
+          alert('Complete all 5 actions first to claim your daily reward');
+          return;
+        }
+
+        // Check if 24-hour cooldown has expired
+        if (task.lastCompletedAt) {
+          const now = new Date();
+          const lastCompletion = new Date(task.lastCompletedAt);
+          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          if (hoursRemaining > 0) {
+            const hours = Math.floor(hoursRemaining);
+            const minutes = Math.floor((hoursRemaining - hours) * 60);
+            alert(`Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.`);
+            return;
+          }
+        }
+
+        // Complete the task and claim reward
+        const productTaskService = new ProductTaskService();
+        const result = await productTaskService.completeProductTask(user.uid, productId);
+
+        if (result.success) {
+          alert(result.message);
+          // Refresh the product list and tasks
+          loadPurchasedProducts();
+        } else {
+          alert(result.message);
+        }
       } else {
-        alert(result.message);
+        // For Basic and Premium plans, use the existing claim mechanism
+        const result = await ProductService.claimReturns(user.uid, productId);
+
+        if (result.success) {
+          alert(result.message);
+          // Refresh the product list to show updated status
+          loadPurchasedProducts();
+        } else {
+          alert(result.message);
+        }
       }
     } catch (error) {
       console.error('Failed to claim returns:', error);
