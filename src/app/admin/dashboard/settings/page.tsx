@@ -34,12 +34,23 @@ interface AppSettings {
     dailyLoginMessage?: string;
   };
   // Add notification banner settings
-  notificationBanner: {
+  notificationBanner?: {
     enabled: boolean;
     message: string;
-    backgroundColor: string;
-    textColor: string;
-    showOnAllPages: boolean;
+    backgroundColor?: string;
+    textColor?: string;
+    showOnAllPages?: boolean;
+  };
+  // Add popup notification settings
+  popupNotification?: {
+    enabled: boolean;
+    title: string;
+    message: string;
+    showOnHomePage: boolean;
+    backgroundColor?: string;
+    textColor?: string;
+    buttonText?: string;
+    buttonLink?: string;
   };
   updatedAt?: any;
 }
@@ -73,6 +84,16 @@ export default function AdminSettingsPage() {
       backgroundColor: '#3b82f6',
       textColor: '#ffffff',
       showOnAllPages: true
+    },
+    popupNotification: {
+      enabled: false,
+      title: 'Welcome!',
+      message: 'Thank you for visiting McDonald Investment!',
+      showOnHomePage: true,
+      backgroundColor: '#3b82f6',
+      textColor: '#ffffff',
+      buttonText: 'Get Started',
+      buttonLink: '/dashboard'
     }
   });
 
@@ -339,11 +360,12 @@ export default function AdminSettingsPage() {
           </DialogHeader>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="limits">Limits</TabsTrigger>
               <TabsTrigger value="socials">Social Links</TabsTrigger>
               <TabsTrigger value="popups">Popup Content</TabsTrigger>
               <TabsTrigger value="notification">Notification Banner</TabsTrigger>
+              <TabsTrigger value="popupnotification">Popup Notification</TabsTrigger>
               <TabsTrigger value="bankaccounts">Bank Accounts</TabsTrigger>
             </TabsList>
 
@@ -608,6 +630,178 @@ export default function AdminSettingsPage() {
                       className="rounded"
                     />
                     <Label htmlFor="bannerShowOnAllPages">Show on all pages</Label>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="popupnotification" className="space-y-6">
+              {/* Popup Notification Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Popup Notification Settings
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure popup notifications that appear when users visit the home page.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="popupEnabled"
+                      checked={settings.popupNotification?.enabled || false}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        popupNotification: {
+                          enabled: e.target.checked,
+                          title: prev.popupNotification?.title || 'Welcome!',
+                          message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                          showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                          backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                          textColor: prev.popupNotification?.textColor || '#ffffff',
+                          buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                          buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                        }
+                      }))}
+                      className="rounded"
+                    />
+                    <Label htmlFor="popupEnabled">Enable Popup Notification</Label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="popupTitle">Popup Title</Label>
+                    <Input
+                      id="popupTitle"
+                      value={settings.popupNotification?.title || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        popupNotification: {
+                          enabled: prev.popupNotification?.enabled || false,
+                          title: e.target.value,
+                          message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                          showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                          backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                          textColor: prev.popupNotification?.textColor || '#ffffff',
+                          buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                          buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                        }
+                      }))}
+                      placeholder="Enter popup title"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="popupMessage">Popup Message</Label>
+                    <Textarea
+                      id="popupMessage"
+                      value={settings.popupNotification?.message || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        popupNotification: {
+                          enabled: prev.popupNotification?.enabled || false,
+                          title: prev.popupNotification?.title || 'Welcome!',
+                          message: e.target.value,
+                          showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                          backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                          textColor: prev.popupNotification?.textColor || '#ffffff',
+                          buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                          buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                        }
+                      }))}
+                      placeholder="Enter popup message"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="popupBackgroundColor">Background Color</Label>
+                      <Input
+                        id="popupBackgroundColor"
+                        type="color"
+                        value={settings.popupNotification?.backgroundColor || '#3b82f6'}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          popupNotification: {
+                            enabled: prev.popupNotification?.enabled || false,
+                            title: prev.popupNotification?.title || 'Welcome!',
+                            message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                            showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                            backgroundColor: e.target.value,
+                            textColor: prev.popupNotification?.textColor || '#ffffff',
+                            buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                            buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                          }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="popupTextColor">Text Color</Label>
+                      <Input
+                        id="popupTextColor"
+                        type="color"
+                        value={settings.popupNotification?.textColor || '#ffffff'}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          popupNotification: {
+                            enabled: prev.popupNotification?.enabled || false,
+                            title: prev.popupNotification?.title || 'Welcome!',
+                            message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                            showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                            backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                            textColor: e.target.value,
+                            buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                            buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                          }
+                        }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="popupButtonText">Button Text (Optional)</Label>
+                    <Input
+                      id="popupButtonText"
+                      value={settings.popupNotification?.buttonText || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        popupNotification: {
+                          enabled: prev.popupNotification?.enabled || false,
+                          title: prev.popupNotification?.title || 'Welcome!',
+                          message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                          showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                          backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                          textColor: prev.popupNotification?.textColor || '#ffffff',
+                          buttonText: e.target.value,
+                          buttonLink: prev.popupNotification?.buttonLink || '/dashboard'
+                        }
+                      }))}
+                      placeholder="e.g., Get Started, Learn More"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="popupButtonLink">Button Link (Optional)</Label>
+                    <Input
+                      id="popupButtonLink"
+                      value={settings.popupNotification?.buttonLink || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        popupNotification: {
+                          enabled: prev.popupNotification?.enabled || false,
+                          title: prev.popupNotification?.title || 'Welcome!',
+                          message: prev.popupNotification?.message || 'Thank you for visiting McDonald Investment!',
+                          showOnHomePage: prev.popupNotification?.showOnHomePage || true,
+                          backgroundColor: prev.popupNotification?.backgroundColor || '#3b82f6',
+                          textColor: prev.popupNotification?.textColor || '#ffffff',
+                          buttonText: prev.popupNotification?.buttonText || 'Get Started',
+                          buttonLink: e.target.value
+                        }
+                      }))}
+                      placeholder="e.g., /dashboard, https://example.com"
+                    />
                   </div>
                 </div>
               </div>

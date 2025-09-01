@@ -46,6 +46,17 @@ export interface AppSettings {
     textColor?: string;
     showOnAllPages?: boolean;
   };
+  // Add popup notification settings
+  popupNotification?: {
+    enabled: boolean;
+    title: string;
+    message: string;
+    showOnHomePage: boolean;
+    backgroundColor?: string;
+    textColor?: string;
+    buttonText?: string;
+    buttonLink?: string;
+  };
   updatedAt?: any;
 }
 
@@ -95,6 +106,16 @@ export class SettingsService {
             backgroundColor: '#3b82f6',
             textColor: '#ffffff',
             showOnAllPages: true
+          },
+          popupNotification: {
+            enabled: false,
+            title: 'Welcome!',
+            message: 'Thank you for visiting McDonald Investment!',
+            showOnHomePage: true,
+            backgroundColor: '#3b82f6',
+            textColor: '#ffffff',
+            buttonText: 'Get Started',
+            buttonLink: '/dashboard'
           }
         };
       }
@@ -213,6 +234,16 @@ export class SettingsService {
             backgroundColor: '#3b82f6',
             textColor: '#ffffff',
             showOnAllPages: true
+          },
+          popupNotification: {
+            enabled: false,
+            title: 'Welcome!',
+            message: 'Thank you for visiting McDonald Investment!',
+            showOnHomePage: true,
+            backgroundColor: '#3b82f6',
+            textColor: '#ffffff',
+            buttonText: 'Get Started',
+            buttonLink: '/dashboard'
           }
         });
       }
