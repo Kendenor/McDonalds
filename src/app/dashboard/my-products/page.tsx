@@ -349,48 +349,7 @@ export default function MyProductsPage() {
     updateCountdowns();
     
     return () => clearInterval(interval);
-  }, []);
-
-  // Manual countdown calculation for tasks that should be locked
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const manualCountdowns = new Map<string, { hours: number; minutes: number; seconds: number }>();
-      
-      productTasks.forEach((task, productId) => {
-        // If task has 5 completed actions and lastCompletedAt, calculate countdown manually
-        if (task.completedActions === 5 && task.lastCompletedAt) {
-          const now = new Date();
-          const lastCompletion = new Date(task.lastCompletedAt);
-          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-          
-          console.log(`[MANUAL COUNTDOWN] ${task.productName}: hoursRemaining = ${hoursRemaining}`);
-          
-          if (hoursRemaining > 0) {
-            const hours = Math.floor(hoursRemaining);
-            const minutes = Math.floor((hoursRemaining - hours) * 60);
-            const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-            manualCountdowns.set(productId, { hours, minutes, seconds });
-            console.log(`[MANUAL COUNTDOWN] Set for ${task.productName}:`, { hours, minutes, seconds });
-          }
-        }
-      });
-      
-      // Update countdowns if we found any manual calculations
-      if (manualCountdowns.size > 0) {
-        console.log('[MANUAL COUNTDOWN] Updating countdowns with:', manualCountdowns);
-        setCountdowns(prev => {
-          const newCountdowns = new Map(prev);
-          manualCountdowns.forEach((value, key) => {
-            newCountdowns.set(key, value);
-          });
-          return newCountdowns;
-        });
-      }
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  }, [productTasks]);
 
   const loadPurchasedProducts = async () => {
     if (!user) {
@@ -641,7 +600,21 @@ export default function MyProductsPage() {
       // Check if task is locked (completed actions = 5 and has lastCompletedAt)
       if (task.completedActions === 5 && task.lastCompletedAt) {
         const now = new Date();
-        const lastCompletion = new Date(task.lastCompletedAt);
+        let lastCompletion: Date;
+        
+        // Handle different date formats safely
+        if (typeof task.lastCompletedAt === 'string') {
+          lastCompletion = new Date(task.lastCompletedAt);
+        } else if (task.lastCompletedAt instanceof Date) {
+          lastCompletion = task.lastCompletedAt;
+        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+          // Handle Firestore Timestamp
+          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+        } else {
+          console.log(`[COUNTDOWN] Invalid lastCompletedAt format for ${task.productName}:`, task.lastCompletedAt);
+          return;
+        }
+        
         const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
@@ -651,7 +624,9 @@ export default function MyProductsPage() {
           timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
           hoursRemaining,
           completedActions: task.completedActions,
-          hasLastCompletedAt: !!task.lastCompletedAt
+          hasLastCompletedAt: !!task.lastCompletedAt,
+          lastCompletedAtType: typeof task.lastCompletedAt,
+          lastCompletedAtValue: task.lastCompletedAt
         });
         
         if (hoursRemaining > 0) {
