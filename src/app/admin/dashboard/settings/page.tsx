@@ -636,6 +636,14 @@ export default function AdminSettingsPage() {
                 <p className="text-sm text-muted-foreground">
                   Manage bank accounts that users can deposit funds to.
                 </p>
+                
+                {/* Important Note */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Important:</strong> After adding, editing, or deleting bank accounts, 
+                    you must click "Save Settings" at the bottom of this page for changes to take effect.
+                  </p>
+                </div>
 
                 {settings.bankAccounts.length > 0 ? (
                   <div className="space-y-3">

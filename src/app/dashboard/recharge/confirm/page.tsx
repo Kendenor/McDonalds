@@ -56,6 +56,8 @@ function ConfirmDepositContent() {
         const loadBankAccounts = async () => {
             try {
                 const settings = await SettingsService.getSettings();
+                console.log('[DEPOSIT] Loading bank accounts from settings:', settings);
+                console.log('[DEPOSIT] Bank accounts found:', settings.bankAccounts);
                 setBankAccounts(settings.bankAccounts || []);
             } catch (error) {
                 console.error('Error loading bank accounts:', error);
@@ -63,8 +65,17 @@ function ConfirmDepositContent() {
             }
             setIsLoading(false);
         };
+        
+        // Load bank accounts
         loadBankAccounts();
-        return () => unsubscribe();
+        
+        // Set up real-time listener for bank account changes
+        const settingsUnsubscribe = SettingsService.onSettingsChange((updatedSettings) => {
+            console.log('[DEPOSIT] Settings updated, new bank accounts:', updatedSettings.bankAccounts);
+            setBankAccounts(updatedSettings.bankAccounts || []);
+        });
+        
+        return () => settingsUnsubscribe();
     }, [router, searchParams, toast]);
 
     const handleCopy = (text: string) => {
