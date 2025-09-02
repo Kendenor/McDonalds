@@ -1472,20 +1472,48 @@ export default function MyProductsPage() {
                                     
                                     // Handle different date formats safely
                                     let lastCompletion;
-                                    if (typeof task.lastCompletedAt === 'string') {
-                                      lastCompletion = new Date(task.lastCompletedAt);
-                                    } else if (task.lastCompletedAt instanceof Date) {
-                                      lastCompletion = task.lastCompletedAt;
-                                    } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-                                      // Handle Firestore Timestamp
-                                      lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-                                    } else {
+                                    try {
+                                      if (typeof task.lastCompletedAt === 'string') {
+                                        lastCompletion = new Date(task.lastCompletedAt);
+                                      } else if (task.lastCompletedAt instanceof Date) {
+                                        lastCompletion = task.lastCompletedAt;
+                                      } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                                        // Handle Firestore Timestamp
+                                        lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                                      } else {
+                                        // Fallback: assume task was just completed
+                                        lastCompletion = new Date(Date.now() - 1000); // 1 second ago
+                                      }
+                                      
+                                      // Validate the parsed date
+                                      if (isNaN(lastCompletion.getTime())) {
+                                        console.log(`[COUNTDOWN ERROR] Invalid date parsed for ${task.productName}:`, {
+                                          lastCompletedAt: task.lastCompletedAt,
+                                          lastCompletedAtType: typeof task.lastCompletedAt,
+                                          parsedDate: lastCompletion
+                                        });
+                                        // Fallback: assume task was just completed
+                                        lastCompletion = new Date(Date.now() - 1000); // 1 second ago
+                                      }
+                                    } catch (error) {
+                                      console.error(`[COUNTDOWN ERROR] Failed to parse date for ${task.productName}:`, error);
                                       // Fallback: assume task was just completed
                                       lastCompletion = new Date(Date.now() - 1000); // 1 second ago
                                     }
                                     
                                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
                                     const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+                                    
+                                    // Validate the date before using toISOString
+                                    if (isNaN(lastCompletion.getTime())) {
+                                      console.log(`[COUNTDOWN ERROR] Invalid date for ${task.productName}:`, {
+                                        lastCompletion,
+                                        lastCompletedAt: task.lastCompletedAt,
+                                        lastCompletedAtType: typeof task.lastCompletedAt
+                                      });
+                                      // Fallback: assume task was just completed
+                                      lastCompletion = new Date(Date.now() - 1000); // 1 second ago
+                                    }
                                     
                                     // Add debug info to see what's happening
                                     console.log(`[COUNTDOWN DEBUG] ${task.productName}:`, {
