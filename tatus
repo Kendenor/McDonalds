@@ -1,0 +1,5 @@
+[33m64fd596[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix Special Plans countdown - now properly counts down from 24:00:00 to 00:00:00 instead of being stuck
+[33m23f05e6[m Add detailed logging to countdown hook to identify why it returns null
+[33mcb34a24[m Add debugging for countdown issue - implement debug panel and refresh button
+[33m17dd3b8[m Fix countdown stuck at 24:00:00 - implement proper time calculation and auto-reset
+[33mb44ff31[m Fix countdown timer not updating in real-time - implement proper countdown calculation

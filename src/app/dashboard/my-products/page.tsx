@@ -41,11 +41,23 @@ function useSpecialPlanCountdown(task: any, productId: string) {
         return;
       }
 
+            console.log('[COUNTDOWN-HOOK] Validation check:', {
+        completedActions: task.completedActions,
+        completedActionsType: typeof task.completedActions,
+        completedActionsEquals5: task.completedActions === 5,
+        hasLastCompletedAt: !!task.lastCompletedAt,
+        lastCompletedAt: task.lastCompletedAt,
+        lastCompletedAtType: typeof task.lastCompletedAt
+      });
+
       if (task.completedActions !== 5 || !task.lastCompletedAt) {
         console.log('[COUNTDOWN] Task validation failed:', { 
-          completedActions: task.completedActions, 
+          completedActions: task.completedActions,
+          completedActionsType: typeof task.completedActions,
+          completedActionsEquals5: task.completedActions === 5,
           hasLastCompletedAt: !!task.lastCompletedAt,
-          lastCompletedAt: task.lastCompletedAt
+          lastCompletedAt: task.lastCompletedAt,
+          lastCompletedAtType: typeof task.lastCompletedAt
         });
         setCountdown(null);
         return;
@@ -1494,16 +1506,14 @@ export default function MyProductsPage() {
                                   const countdownData = countdown ? {
                                     hours: countdown.hours,
                                     minutes: countdown.minutes,
-                                    seconds: countdown.seconds,
-                                    isExpired: countdown.isExpired
+                                    seconds: countdown.seconds
                                   } : {
                                     hours: Math.floor(hoursRemaining),
                                     minutes: Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60),
-                                    seconds: Math.floor(((hoursRemaining - Math.floor(hoursRemaining)) * 60 - Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60)) * 60),
-                                    isExpired: hoursRemaining <= 0
+                                    seconds: Math.floor(((hoursRemaining - Math.floor(hoursRemaining)) * 60 - Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60)) * 60)
                                   };
 
-                                  if (countdownData && !countdownData.isExpired) {
+                                  if (countdownData && countdownData.hours > 0) {
                                     // Show countdown using the hook result
                                     return (
                                       <div className="text-center space-y-3">
