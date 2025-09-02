@@ -1357,8 +1357,21 @@ export default function MyProductsPage() {
                               <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
                                 <p>Debug: Task completedActions = {task.completedActions}</p>
                                 <p>Debug: Task lastCompletedAt = {task.lastCompletedAt ? 'exists' : 'null'}</p>
-                                <p>Debug: Countdown hook result = {countdown ? JSON.stringify(countdown) : 'null'}</p>
+                                <p>Debug: lastCompletedAt type = {typeof task.lastCompletedAt}</p>
+                                <p>Debug: lastCompletedAt value = {JSON.stringify(task.lastCompletedAt)}</p>
+                                <p>Debug: Countdown from state = {countdown ? JSON.stringify(countdown) : 'null'}</p>
                                 <p>Debug: Should show countdown = {countdown && countdown.hours > 0 ? 'YES' : 'NO'}</p>
+                                <p>Debug: Task validation = {task.completedActions === 5 && task.lastCompletedAt ? 'PASSED' : 'FAILED'}</p>
+                                <button 
+                                  onClick={() => {
+                                    console.log('[DEBUG] Manual countdown update triggered');
+                                    updateCountdowns();
+                                    console.log('[DEBUG] Current countdowns after update:', countdowns);
+                                  }}
+                                  className="mt-2 px-2 py-1 bg-blue-500 text-white text-xs rounded"
+                                >
+                                  Force Update Countdown
+                                </button>
                               </div>
                               
                               {countdown && countdown.hours > 0 ? (
