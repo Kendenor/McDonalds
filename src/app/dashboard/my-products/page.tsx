@@ -1464,164 +1464,83 @@ export default function MyProductsPage() {
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
                               {/* PRIORITY 1: Show countdown if task is locked (completedActions === 5 and has lastCompletedAt) */}
-                              {task.completedActions === 5 && task.lastCompletedAt ? (
-                                (() => {
-                                  try {
-                                    // Calculate countdown on-the-fly
-                                    const now = new Date();
+                                                            {task.completedActions === 5 && task.lastCompletedAt ? (
+                                countdown ? (
+                                  // Show countdown using the hook result
+                                  <div className="text-center space-y-3">
+                                    <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                      <Clock className="h-4 w-4" />
+                                      <span className="font-medium">⏰ Task Locked - Countdown Active</span>
+                                    </div>
                                     
-                                    // Handle different date formats safely
-                                    let lastCompletion;
-                                    try {
-                                      if (typeof task.lastCompletedAt === 'string') {
-                                        lastCompletion = new Date(task.lastCompletedAt);
-                                      } else if (task.lastCompletedAt instanceof Date) {
-                                        lastCompletion = task.lastCompletedAt;
-                                      } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-                                        // Handle Firestore Timestamp
-                                        lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-                                      } else {
-                                        // Fallback: assume task was just completed
-                                        lastCompletion = new Date(Date.now() - 1000); // 1 second ago
-                                      }
-                                      
-                                      // Validate the parsed date
-                                      if (isNaN(lastCompletion.getTime())) {
-                                        console.log(`[COUNTDOWN ERROR] Invalid date parsed for ${task.productName}:`, {
-                                          lastCompletedAt: task.lastCompletedAt,
-                                          lastCompletedAtType: typeof task.lastCompletedAt,
-                                          parsedDate: lastCompletion
-                                        });
-                                        // Fallback: assume task was just completed
-                                        lastCompletion = new Date(Date.now() - 1000); // 1 second ago
-                                      }
-                                    } catch (error) {
-                                      console.error(`[COUNTDOWN ERROR] Failed to parse date for ${task.productName}:`, error);
-                                      // Fallback: assume task was just completed
-                                      lastCompletion = new Date(Date.now() - 1000); // 1 second ago
-                                    }
-                                    
-                                    const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-                                    const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-                                    
-                                    // Validate the date before using toISOString
-                                    if (isNaN(lastCompletion.getTime())) {
-                                      console.log(`[COUNTDOWN ERROR] Invalid date for ${task.productName}:`, {
-                                        lastCompletion,
-                                        lastCompletedAt: task.lastCompletedAt,
-                                        lastCompletedAtType: typeof task.lastCompletedAt
-                                      });
-                                      // Fallback: assume task was just completed
-                                      lastCompletion = new Date(Date.now() - 1000); // 1 second ago
-                                    }
-                                    
-                                    // Add debug info to see what's happening
-                                    console.log(`[COUNTDOWN DEBUG] ${task.productName}:`, {
-                                      now: now.toISOString(),
-                                      lastCompletion: lastCompletion.toISOString(),
-                                      timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-                                      hoursRemaining,
-                                      completedActions: task.completedActions,
-                                      hasLastCompletedAt: !!task.lastCompletedAt,
-                                      lastCompletedAtType: typeof task.lastCompletedAt,
-                                      lastCompletedAtValue: task.lastCompletedAt
-                                    });
-                                    
-                                    // Check if task was just completed (within last 5 minutes)
-                                    const justCompleted = timeSinceLastCompletion < 5 * 60 * 1000; // 5 minutes in milliseconds
-                                  
-                                  // Use the countdown hook result if available, otherwise fall back to calculated values
-                                  const countdownData = countdown ? {
-                                    hours: countdown.hours,
-                                    minutes: countdown.minutes,
-                                    seconds: countdown.seconds
-                                  } : {
-                                    hours: Math.floor(hoursRemaining),
-                                    minutes: Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60),
-                                    seconds: Math.floor(((hoursRemaining - Math.floor(hoursRemaining)) * 60 - Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60)) * 60)
-                                  };
-
-                                  if (countdownData && countdownData.hours > 0) {
-                                    // Show countdown using the hook result
-                                    return (
-                                      <div className="text-center space-y-3">
-                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                          <Clock className="h-4 w-4" />
-                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
+                                    {/* Enhanced Countdown Display */}
+                                    <div className={`p-4 rounded-lg border transition-all duration-500 ${
+                                      countdown.hours === 0 && countdown.minutes <= 5 
+                                        ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
+                                        : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800'
+                                    }`}>
+                                      <div className="text-center">
+                                        <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                          {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}:{countdown.seconds.toString().padStart(2, '0')}
                                         </div>
-                                        
-                                        {/* Enhanced Countdown Display */}
-                                        <div className={`p-4 rounded-lg border transition-all duration-500 ${
-                                          countdownData.hours === 0 && countdownData.minutes <= 5 
-                                            ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
-                                            : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800'
-                                        }`}>
-                                          <div className="text-center">
-                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                              {countdownData.hours.toString().padStart(2, '0')}:{countdownData.minutes.toString().padStart(2, '0')}:{countdownData.seconds.toString().padStart(2, '0')}
-                                            </div>
-                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                              Hours : Minutes : Seconds Remaining
-                                            </div>
-                                            {countdownData.hours === 0 && countdownData.minutes <= 5 && (
-                                              <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
-                                                ⚡ Almost ready! Get prepared for next task cycle!
-                                              </div>
-                                            )}
-                                          </div>
+                                        <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                          Hours : Minutes : Seconds Remaining
                                         </div>
-                                        
-                                        {/* Progress Bar for Visual Feedback */}
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-xs text-muted-foreground">
-                                            <span>Time Remaining</span>
-                                            <span>{Math.round((countdownData.hours * 60 + countdownData.minutes) / 24 / 60 * 100)}%</span>
+                                        {countdown.hours === 0 && countdown.minutes <= 5 && (
+                                          <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
+                                            ⚡ Almost ready! Get prepared for next task cycle!
                                           </div>
-                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div 
-                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                              style={{ 
-                                                width: `${Math.max(0, Math.round((countdownData.hours * 60 + countdownData.minutes) / 24 / 60 * 100))}%` 
-                                              }}
-                                            ></div>
-                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Progress Bar for Visual Feedback */}
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>Time Remaining</span>
+                                        <span>{Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100)}%</span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                        <div 
+                                          className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
+                                          style={{ 
+                                            width: `${Math.max(0, Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100))}%` 
+                                          }}
+                                        ></div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="text-center">
+                                      <p className="text-xs text-muted-foreground">
+                                        🔒 Complete 5 actions again after countdown expires
+                                      </p>
+                                      <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                        {countdown.hours === 0 && countdown.minutes <= 5 
+                                          ? '⚡ Next task cycle will be available very soon!' 
+                                          : 'Next task cycle will be available soon!'
+                                        }
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // Countdown hook is still loading or failed
+                                  <div className="text-center space-y-3">
+                                    <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                      <Clock className="h-4 w-4" />
+                                      <span className="font-medium">⏰ Task Locked - Loading Countdown...</span>
+                                    </div>
+                                    <div className="p-4 rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
+                                      <div className="text-center">
+                                        <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                          --:--:--
                                         </div>
-                                        
-                                        <div className="text-center">
-                                          <p className="text-xs text-muted-foreground">
-                                            🔒 Complete 5 actions again after countdown expires
-                                          </p>
-                                          <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                            {countdownData.hours === 0 && countdownData.minutes <= 5 
-                                              ? '⚡ Next task cycle will be available very soon!' 
-                                              : 'Next task cycle will be available soon!'
-                                            }
-                                          </div>
+                                        <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                          Loading countdown...
                                         </div>
                                       </div>
-                                    );
-                                  } else if (hoursRemaining > 0) {
-                                  } else {
-                                    return (
-                                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border">
-                                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                                          ✅ Task ready! You can now complete 5 actions again.
-                                        </p>
-                                      </div>
-                                    );
-                                  }
-                                  } catch (error) {
-                                    console.error('[COUNTDOWN ERROR] Failed to calculate countdown:', error);
-                                    // Fallback: show error message
-                                    return (
-                                      <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border">
-                                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                                          ⚠️ Error calculating countdown. Please refresh the page.
-                                        </p>
-                                      </div>
-                                    );
-                                  }
-                                })()
+                                    </div>
+                                  </div>
+                                )
                               ) : status?.canComplete ? (
                                 /* PRIORITY 2: Show complete button if task can be completed */
                                 <Button 
