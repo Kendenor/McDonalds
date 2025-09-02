@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -90,14 +89,29 @@ function useSpecialPlanCountdown(task: any, productId: string) {
           }
 
           const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          // Check if the task was just completed (within 5 seconds)
+          // If so, start countdown from 24 hours
+          const justCompleted = timeSinceLastCompletion < 5000; // 5 seconds
+          
+          let hoursRemaining: number;
+          if (justCompleted) {
+            // Task was just completed, start countdown from 24 hours
+            hoursRemaining = 24;
+            console.log('[COUNTDOWN-HOOK] Task just completed, starting countdown from 24 hours');
+          } else {
+            // Calculate remaining time based on actual elapsed time
+            hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+            console.log('[COUNTDOWN-HOOK] Calculating remaining time based on elapsed time');
+          }
 
           console.log(`[COUNTDOWN-HOOK] ${task.productName}:`, {
             lastCompletion: lastCompletion.toISOString(),
             now: now.toISOString(),
             timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
             hoursRemaining,
-            timeSinceLastCompletionMs: timeSinceLastCompletion
+            timeSinceLastCompletionMs: timeSinceLastCompletion,
+            justCompleted
           });
 
           if (hoursRemaining <= 0) {
@@ -150,7 +164,7 @@ function useSpecialPlanCountdown(task: any, productId: string) {
   }, [task, productId]);
 
   return countdown;
- }
+}
 
 interface PurchasedProduct {
   id: string;
@@ -238,18 +252,18 @@ export default function MyProductsPage() {
 
   useEffect(() => {
     try {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         try {
-          setUser(currentUser);
-          if (currentUser) {
-            loadPurchasedProducts();
+      setUser(currentUser);
+      if (currentUser) {
+        loadPurchasedProducts();
           }
         } catch (error) {
           console.error('[AUTH] Error in auth state change handler:', error);
           setError('Authentication error occurred');
-        }
-      });
-      return () => unsubscribe();
+      }
+    });
+    return () => unsubscribe();
     } catch (error) {
       console.error('[AUTH] Error setting up auth listener:', error);
       setError('Failed to initialize authentication');
@@ -360,70 +374,70 @@ export default function MyProductsPage() {
       if (!isMounted) return;
       
       try {
-        const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
-        if (specialPlans.length > 0) {
-          // Check if any Special plans are missing tasks
-          const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
-          if (missingTasks.length > 0) {
-            console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
-            
+      const specialPlans = purchasedProducts.filter(p => p.planType === 'Special');
+      if (specialPlans.length > 0) {
+        // Check if any Special plans are missing tasks
+        const missingTasks = specialPlans.filter(product => !productTasks.has(product.id));
+        if (missingTasks.length > 0) {
+          console.log('[PRODUCTS] Auto-check: Found Special plans missing tasks:', missingTasks.map(p => p.name));
+          
             // Process missing tasks sequentially to avoid race conditions
             for (const product of missingTasks) {
               if (!isMounted) break; // Stop if component unmounted
               
               try {
                 console.log(`[PRODUCTS] Auto-checking for missing task for ${product.name}`);
-                const productTaskService = new ProductTaskService();
-                const existingTask = await productTaskService.getProductTask(user.uid, product.id);
+              const productTaskService = new ProductTaskService();
+              const existingTask = await productTaskService.getProductTask(user.uid, product.id);
                 
                 if (!isMounted) break; // Check again before updating state
+              
+              if (existingTask) {
+                console.log(`[PRODUCTS] Auto-check found existing task for ${product.name}:`, existingTask);
                 
-                if (existingTask) {
-                  console.log(`[PRODUCTS] Auto-check found existing task for ${product.name}:`, existingTask);
-                  
-                  // Update UI with existing task
-                  setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
-                  
-                  // Get and set task status
-                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                // Update UI with existing task
+                setProductTasks(prev => new Map(prev.set(product.id, existingTask)));
+                
+                // Get and set task status
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
                   if (isMounted) {
-                    setTaskStatuses(prev => new Map(prev.set(product.id, status)));
-                    console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
+                setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
                   }
-                } else {
-                  console.log(`[PRODUCTS] Auto-check: No existing task found, creating new one for ${product.name}`);
-                  try {
-                    const newTask = await productTaskService.createProductTask(
-                      user.uid,
-                      product.id,
-                      product.name,
-                      product.totalEarning,
-                      product.cycleDays
-                    );
+              } else {
+                console.log(`[PRODUCTS] Auto-check: No existing task found, creating new one for ${product.name}`);
+                try {
+                  const newTask = await productTaskService.createProductTask(
+                    user.uid,
+                    product.id,
+                    product.name,
+                    product.totalEarning,
+                    product.cycleDays
+                  );
                     
                     if (!isMounted) break; // Check again before updating state
+                  
+                  if (newTask) {
+                    console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
                     
-                    if (newTask) {
-                      console.log(`[PRODUCTS] Auto-created task for ${product.name}:`, newTask);
-                      
-                      // Update UI immediately
-                      setProductTasks(prev => new Map(prev.set(product.id, newTask)));
-                      
-                      // Get and set task status
-                      const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                    // Update UI immediately
+                    setProductTasks(prev => new Map(prev.set(product.id, newTask)));
+                    
+                    // Get and set task status
+                    const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
                       if (isMounted) {
-                        setTaskStatuses(prev => new Map(prev.set(product.id, status)));
-                        console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
+                    setTaskStatuses(prev => new Map(prev.set(product.id, status)));
+                    console.log(`[PRODUCTS] Auto-check task status set for ${product.name}:`, status);
                       }
-                    }
-                  } catch (error) {
-                    console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
                   }
+                } catch (error) {
+                  console.error(`[PRODUCTS] Failed to auto-create task for ${product.name}:`, error);
                 }
-              } catch (error) {
-                console.error(`[PRODUCTS] Failed to auto-check task for ${product.name}:`, error);
               }
+            } catch (error) {
+              console.error(`[PRODUCTS] Failed to auto-check task for ${product.name}:`, error);
             }
+        }
           }
         }
       } catch (error) {
@@ -560,69 +574,69 @@ export default function MyProductsPage() {
     if (!user) return;
     
     try {
-      console.log('[PRODUCTS] Loading tasks for', products.length, 'products (attempt', retryCount + 1, ')');
-      
-      const tasksMap = new Map<string, ProductTask>();
-      const statusesMap = new Map<string, TaskStatus>();
-      const productTaskService = new ProductTaskService();
-      
-      for (const product of products) {
-        try {
+    console.log('[PRODUCTS] Loading tasks for', products.length, 'products (attempt', retryCount + 1, ')');
+    
+    const tasksMap = new Map<string, ProductTask>();
+    const statusesMap = new Map<string, TaskStatus>();
+    const productTaskService = new ProductTaskService();
+    
+    for (const product of products) {
+      try {
           if (!user?.uid) {
             console.log('[PRODUCTS] User no longer logged in, stopping task loading');
             break;
           }
           
-          console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
-          console.log(`[PRODUCTS] Product details:`, {
-            id: product.id,
-            name: product.name,
-            planType: product.planType,
-            status: product.status,
-            totalEarning: product.totalEarning,
-            cycleDays: product.cycleDays
-          });
+        console.log(`[PRODUCTS] Loading task for product: ${product.name} (${product.id})`);
+        console.log(`[PRODUCTS] Product details:`, {
+          id: product.id,
+          name: product.name,
+          planType: product.planType,
+          status: product.status,
+          totalEarning: product.totalEarning,
+          cycleDays: product.cycleDays
+        });
 
-          let task = await productTaskService.getProductTask(user.uid, product.id);
+        let task = await productTaskService.getProductTask(user.uid, product.id);
+        
+        if (task) {
+          console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
+          tasksMap.set(product.id, task);
           
-          if (task) {
-            console.log(`[PRODUCTS] Task found for ${product.name}:`, task);
-            tasksMap.set(product.id, task);
+          // Get task status
+          const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+          statusesMap.set(product.id, status);
+          console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
+        } else {
+          console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
+          
+          // For Special plans, try to create the task if it doesn't exist
+          if (product.planType === 'Special') {
+            console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
+            console.log(`[PRODUCTS] Creating task with params:`, {
+              userId: user.uid,
+              productId: product.id,
+              productName: product.name,
+              totalReturn: product.totalEarning,
+              cycleDays: product.cycleDays
+            });
             
-            // Get task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-            statusesMap.set(product.id, status);
-            console.log(`[PRODUCTS] Task status for ${product.name}:`, status);
-          } else {
-            console.log(`[PRODUCTS] No task found for ${product.name} (${product.id})`);
-            
-            // For Special plans, try to create the task if it doesn't exist
-            if (product.planType === 'Special') {
-              console.log(`[PRODUCTS] Attempting to create missing task for Special plan: ${product.name}`);
-              console.log(`[PRODUCTS] Creating task with params:`, {
-                userId: user.uid,
-                productId: product.id,
-                productName: product.name,
-                totalReturn: product.totalEarning,
-                cycleDays: product.cycleDays
-              });
+            try {
+              const newTask = await productTaskService.createProductTask(
+                user.uid,
+                product.id,
+                product.name,
+                product.totalEarning,
+                product.cycleDays
+              );
+              console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
               
-              try {
-                const newTask = await productTaskService.createProductTask(
-                  user.uid,
-                  product.id,
-                  product.name,
-                  product.totalEarning,
-                  product.cycleDays
-                );
-                console.log(`[PRODUCTS] Successfully created missing task:`, newTask);
+              if (newTask) {
+                tasksMap.set(product.id, newTask);
                 
-                if (newTask) {
-                  tasksMap.set(product.id, newTask);
-                  
-                  // Get task status for new task
-                  const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
-                  statusesMap.set(product.id, status);
+                // Get task status for new task
+                const status = await productTaskService.canCompleteProductTask(user.uid, product.id);
+                statusesMap.set(product.id, status);
                 
                 console.log(`[PRODUCTS] Task created and status loaded for ${product.name}:`, status);
                 
@@ -700,18 +714,18 @@ export default function MyProductsPage() {
   } catch (error) {
     console.error('[PRODUCTS] Failed to load product tasks:', error);
     setError('Failed to load product tasks. Please try again.');
-  }
-};
+    }
+  };
 
 
 
   const updateCountdowns = () => {
     try {
-      const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
-      
-      console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
-      
-      productTasks.forEach((task, productId) => {
+    const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
+    
+    console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
+    
+    productTasks.forEach((task, productId) => {
       console.log(`[COUNTDOWN] Checking task for ${task.productName}:`, {
         completedActions: task.completedActions,
         lastCompletedAt: task.lastCompletedAt,
@@ -820,7 +834,7 @@ export default function MyProductsPage() {
       // Also check nextAvailableTime for legacy support
       if (task.nextAvailableTime) {
         try {
-          const now = new Date();
+        const now = new Date();
           
           // Validate nextAvailableTime before using it
           if (isNaN(task.nextAvailableTime.getTime())) {
@@ -828,27 +842,27 @@ export default function MyProductsPage() {
             return;
           }
           
-          const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
-          
-          if (timeRemaining > 0) {
-            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+        const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
+        
+        if (timeRemaining > 0) {
+          const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+          const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
             
             // Only set countdown if we don't already have one from lastCompletedAt
             if (!countdownsMap.has(productId)) {
-              countdownsMap.set(productId, { hours, minutes, seconds });
-              console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
+          countdownsMap.set(productId, { hours, minutes, seconds });
+          console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
             }
           }
         } catch (error) {
           console.error(`[COUNTDOWN] Error processing nextAvailableTime for ${task.productName}:`, error);
         }
       }
-      });
-      
-      console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
-      setCountdowns(countdownsMap);
+    });
+    
+    console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
+    setCountdowns(countdownsMap);
     } catch (error) {
       console.error('[COUNTDOWN] Error updating countdowns:', error);
       // Don't set error state here as it's not critical for the main functionality
@@ -1068,7 +1082,21 @@ export default function MyProductsPage() {
           const now = new Date();
           const lastCompletion = new Date(task.lastCompletedAt);
           const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          // Check if the task was just completed (within 5 seconds)
+          // If so, start countdown from 24 hours
+          const justCompleted = timeSinceLastCompletion < 5000; // 5 seconds
+          
+          let hoursRemaining: number;
+          if (justCompleted) {
+            // Task was just completed, start countdown from 24 hours
+            hoursRemaining = 24;
+            console.log('[COUNTDOWN-HOOK] Task just completed, starting countdown from 24 hours');
+          } else {
+            // Calculate remaining time based on actual elapsed time
+            hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+            console.log('[COUNTDOWN-HOOK] Calculating remaining time based on elapsed time');
+          }
           
           if (hoursRemaining > 0) {
             const hours = Math.floor(hoursRemaining);
@@ -1091,14 +1119,14 @@ export default function MyProductsPage() {
         }
       } else {
         // For Basic and Premium plans, use the existing claim mechanism
-        const result = await ProductService.claimReturns(user.uid, productId);
+      const result = await ProductService.claimReturns(user.uid, productId);
 
-        if (result.success) {
-          alert(result.message);
-          // Refresh the product list to show updated status
-          loadPurchasedProducts();
-        } else {
-          alert(result.message);
+      if (result.success) {
+        alert(result.message);
+        // Refresh the product list to show updated status
+        loadPurchasedProducts();
+      } else {
+        alert(result.message);
         }
       }
     } catch (error) {
@@ -1340,8 +1368,8 @@ export default function MyProductsPage() {
                                       {countdown.hours === 0 && countdown.minutes <= 5 && (
                                         <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
                                           ⚡ Almost ready! Get prepared for next task cycle!
-                                        </div>
-                                      )}
+                                </div>
+                              )}
                                     </div>
                                   </div>
                                   
@@ -1462,57 +1490,21 @@ export default function MyProductsPage() {
                                     // Check if task was just completed (within last 5 minutes)
                                     const justCompleted = timeSinceLastCompletion < 5 * 60 * 1000; // 5 minutes in milliseconds
                                   
-                                  if (justCompleted) {
-                                    // Task was just completed, show countdown starting from 24 hours
-                                    return (
-                                      <div className="text-center space-y-3">
-                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                          <Clock className="h-4 w-4" />
-                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
-                                        </div>
-                                        
-                                        {/* Enhanced Countdown Display */}
-                                        <div className="p-4 rounded-lg border transition-all duration-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
-                                          <div className="text-center">
-                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                              24:00:00
-                                            </div>
-                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                              Hours : Minutes : Seconds Remaining
-                                            </div>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Progress Bar for Visual Feedback */}
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-xs text-muted-foreground">
-                                            <span>Time Remaining</span>
-                                            <span>100%</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div 
-                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                              style={{ width: '100%' }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="text-center">
-                                          <p className="text-xs text-muted-foreground">
-                                            🔒 Complete 5 actions again after countdown expires
-                                          </p>
-                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                            Next task cycle will be available soon!
-                                          </p>
-                                        </div>
-                                      </div>
-                                    );
-                                  } else if (hoursRemaining > 0) {
-                                    // Normal countdown calculation
-                                    const hours = Math.floor(hoursRemaining);
-                                    const minutes = Math.floor((hoursRemaining - hours) * 60);
-                                    const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-                                    
+                                  // Use the countdown hook result if available, otherwise fall back to calculated values
+                                  const countdownData = countdown ? {
+                                    hours: countdown.hours,
+                                    minutes: countdown.minutes,
+                                    seconds: countdown.seconds,
+                                    isExpired: countdown.isExpired
+                                  } : {
+                                    hours: Math.floor(hoursRemaining),
+                                    minutes: Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60),
+                                    seconds: Math.floor(((hoursRemaining - Math.floor(hoursRemaining)) * 60 - Math.floor((hoursRemaining - Math.floor(hoursRemaining)) * 60)) * 60),
+                                    isExpired: hoursRemaining <= 0
+                                  };
+
+                                  if (countdownData && !countdownData.isExpired) {
+                                    // Show countdown using the hook result
                                     return (
                                       <div className="text-center space-y-3">
                                         <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
@@ -1522,18 +1514,18 @@ export default function MyProductsPage() {
                                         
                                         {/* Enhanced Countdown Display */}
                                         <div className={`p-4 rounded-lg border transition-all duration-500 ${
-                                          hours === 0 && minutes <= 5 
+                                          countdownData.hours === 0 && countdownData.minutes <= 5 
                                             ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
                                             : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800'
                                         }`}>
                                           <div className="text-center">
                                             <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                              {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                                              {countdownData.hours.toString().padStart(2, '0')}:{countdownData.minutes.toString().padStart(2, '0')}:{countdownData.seconds.toString().padStart(2, '0')}
                                             </div>
                                             <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
                                               Hours : Minutes : Seconds Remaining
                                             </div>
-                                            {hours === 0 && minutes <= 5 && (
+                                            {countdownData.hours === 0 && countdownData.minutes <= 5 && (
                                               <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
                                                 ⚡ Almost ready! Get prepared for next task cycle!
                                               </div>
@@ -1545,13 +1537,13 @@ export default function MyProductsPage() {
                                         <div className="space-y-1">
                                           <div className="flex justify-between text-xs text-muted-foreground">
                                             <span>Time Remaining</span>
-                                            <span>{Math.round((hours * 60 + minutes) / 24 / 60 * 100)}%</span>
+                                            <span>{Math.round((countdownData.hours * 60 + countdownData.minutes) / 24 / 60 * 100)}%</span>
                                           </div>
                                           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                             <div 
                                               className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
                                               style={{ 
-                                                width: `${Math.max(0, Math.round((hours * 60 + minutes) / 24 / 60 * 100))}%` 
+                                                width: `${Math.max(0, Math.round((countdownData.hours * 60 + countdownData.minutes) / 24 / 60 * 100))}%` 
                                               }}
                                             ></div>
                                           </div>
@@ -1561,12 +1553,16 @@ export default function MyProductsPage() {
                                           <p className="text-xs text-muted-foreground">
                                             🔒 Complete 5 actions again after countdown expires
                                           </p>
-                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                            Next task cycle will be available soon!
-                                          </p>
+                                          <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                            {countdownData.hours === 0 && countdownData.minutes <= 5 
+                                              ? '⚡ Next task cycle will be available very soon!' 
+                                              : 'Next task cycle will be available soon!'
+                                            }
+                                          </div>
                                         </div>
                                       </div>
                                     );
+                                  } else if (hoursRemaining > 0) {
                                   } else {
                                     return (
                                       <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border">
@@ -1578,48 +1574,12 @@ export default function MyProductsPage() {
                                   }
                                   } catch (error) {
                                     console.error('[COUNTDOWN ERROR] Failed to calculate countdown:', error);
-                                    // Fallback: show a default countdown since task is locked
+                                    // Fallback: show error message
                                     return (
-                                      <div className="text-center space-y-3">
-                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                          <Clock className="h-4 w-4" />
-                                          <span className="font-medium">⏰ Task Locked - Countdown Active</span>
-                                        </div>
-                                        
-                                        {/* Fallback Countdown Display */}
-                                        <div className="p-4 rounded-lg border transition-all duration-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
-                                          <div className="text-center">
-                                            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                              24:00:00
-                                            </div>
-                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                              Hours : Minutes : Seconds Remaining
-                                            </div>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Progress Bar for Visual Feedback */}
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-xs text-muted-foreground">
-                                            <span>Time Remaining</span>
-                                            <span>100%</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div 
-                                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                              style={{ width: '100%' }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="text-center">
-                                          <p className="text-xs text-muted-foreground">
-                                            🔒 Complete 5 actions again after countdown expires
-                                          </p>
-                                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                            Next task cycle will be available soon!
-                                          </p>
-                                        </div>
+                                      <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border">
+                                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                          ⚠️ Error calculating countdown. Please refresh the page.
+                                        </p>
                                       </div>
                                     );
                                   }
