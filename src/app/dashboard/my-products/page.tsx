@@ -245,19 +245,23 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+                console.log(`[RESET DEBUG] Task ${productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
+                console.log(`[RESET DEBUG] Task ${productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
+              console.log(`[RESET DEBUG] Task ${productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
+              console.log(`[RESET] Resetting task for ${productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -275,6 +279,8 @@ export default function MyProductsPage() {
               } catch (error) {
                 console.error(`Failed to reset task for ${productId}:`, error);
               }
+            } else {
+              console.log(`[RESET] Task ${productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
@@ -412,19 +418,23 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+                console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
+                console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
+              console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
+              console.log(`[BACKGROUND RESET] Resetting task for ${productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -450,6 +460,8 @@ export default function MyProductsPage() {
               } catch (error) {
                 console.error(`Failed to reset task for ${productId}:`, error);
               }
+            } else {
+              console.log(`[BACKGROUND RESET] Task ${productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
