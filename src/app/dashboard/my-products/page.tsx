@@ -1547,19 +1547,19 @@ export default function MyProductsPage() {
                                     </div>
                                   </div>
                                 ) : (
-                                  // Countdown hook is still loading or failed
+                                  // Countdown hook is null - show task ready
                                   <div className="text-center space-y-3">
-                                    <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                      <Clock className="h-4 w-4" />
-                                      <span className="font-medium">⏰ Task Locked - Loading Countdown...</span>
+                                    <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
+                                      <CheckCircle className="h-4 w-4" />
+                                      <span className="font-medium">✅ Task ready!</span>
                                     </div>
-                                    <div className="p-4 rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
+                                    <div className="p-4 rounded-lg border bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
                                       <div className="text-center">
-                                        <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                          --:--:--
+                                        <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-1">
+                                          You can now complete 5 actions again.
                                         </div>
-                                        <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                          Loading countdown...
+                                        <div className="text-sm text-green-500 dark:text-green-300 font-medium">
+                                          Daily task cycle is ready!
                                         </div>
                                       </div>
                                     </div>
