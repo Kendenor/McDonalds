@@ -746,6 +746,17 @@ export default function MyProductsPage() {
       
       // Check if task is locked (completed actions = 5 and has lastCompletedAt)
       if (task.completedActions === 5 && task.lastCompletedAt) {
+        // Additional check: if lastCompletedAt is already an Invalid Date, skip it
+        if (task.lastCompletedAt instanceof Date && isNaN(task.lastCompletedAt.getTime())) {
+          console.log(`[COUNTDOWN] Invalid Date detected for ${task.productName}, skipping countdown`);
+          return;
+        }
+        
+        // Additional check: if lastCompletedAt is an object but contains null, skip it
+        if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && JSON.stringify(task.lastCompletedAt) === 'null') {
+          console.log(`[COUNTDOWN] Null object detected for ${task.productName}, skipping countdown`);
+          return;
+        }
         const now = new Date();
         let lastCompletion: Date;
         
