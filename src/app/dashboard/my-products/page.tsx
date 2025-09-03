@@ -350,13 +350,6 @@ export default function MyProductsPage() {
     };
   }, [user, purchasedProducts, productTasks]);
 
-  // Real-time countdown timer - update every second for better UX
-  useEffect(() => {
-    if (productTasks.size === 0) return;
-    
-
-  }, [productTasks]);
-
   const loadPurchasedProducts = async () => {
     if (!user) {
       return;
