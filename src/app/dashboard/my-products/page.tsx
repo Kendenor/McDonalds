@@ -248,23 +248,19 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-                console.log(`[RESET DEBUG] Task ${task.productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
-                console.log(`[RESET DEBUG] Task ${task.productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
-              console.log(`[RESET DEBUG] Task ${task.productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
-              console.log(`[RESET] Resetting task for ${task.productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -277,8 +273,6 @@ export default function MyProductsPage() {
               } catch (error) {
                 console.error(`Failed to reset task for ${task.productId}:`, error);
               }
-            } else {
-              console.log(`[RESET] Task ${task.productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
@@ -419,23 +413,19 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-                console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
-                console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
-              console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
-              console.log(`[BACKGROUND RESET] Resetting task for ${task.productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -450,8 +440,6 @@ export default function MyProductsPage() {
               } catch (error) {
                 console.error(`Failed to reset task for ${task.productId}:`, error);
               }
-            } else {
-              console.log(`[BACKGROUND RESET] Task ${task.productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
@@ -798,30 +786,29 @@ export default function MyProductsPage() {
       const result = await productTaskService.completeProductTask(user.uid, productId);
       
       if (result.success) {
-        console.log(`[TASK COMPLETION] Task completed successfully for ${productId}`);
-        
         // Update the task in state
         const task = productTasks.get(productId);
         if (task) {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-            console.log(`[TASK COMPLETION] Updated task data:`, {
-              completedActions: updatedTask.completedActions,
-              lastCompletedAt: updatedTask.lastCompletedAt,
-              totalEarned: updatedTask.totalEarned
-            });
-            
-            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
           
-            // Update task status
-            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            // Update task status - force locked status for completed tasks
+          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
             
-            console.log(`[TASK COMPLETION] Task status after completion:`, status);
-            
-            // CRITICAL: Update countdowns immediately after task completion
-            // This ensures the timer shows up right away
+            // If task is completed (5 actions), force it to be locked
+            if (updatedTask.completedActions === 5) {
+              const lockedStatus = {
+                canComplete: false,
+                message: 'Task completed! Locked for 24 hours.',
+                progress: 100,
+                remainingActions: 0
+              };
+              setTaskStatuses(new Map(taskStatuses.set(productId, lockedStatus)));
+            } else {
+          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            }
             
             // Immediate countdown calculation for this specific task
             if (updatedTask.completedActions === 5 && updatedTask.lastCompletedAt) {
@@ -1117,17 +1104,10 @@ export default function MyProductsPage() {
                      const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
                      
                      isLocked = hoursSinceCompletion < 24;
-                     
-                     console.log(`[UI LOCK DEBUG] Task ${product.id}: completedActions=${task.completedActions}, lastCompletion=${lastCompletion}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}, isLocked=${isLocked}`);
-                   } else {
-                     console.log(`[UI LOCK DEBUG] Task ${product.id}: Invalid lastCompletion date`);
                    }
                  } catch (error) {
-                   console.log(`[UI LOCK DEBUG] Task ${product.id}: Error calculating lock status:`, error);
                    isLocked = false;
                  }
-               } else {
-                 console.log(`[UI LOCK DEBUG] Task ${product.id}: Not locked - completedActions=${task?.completedActions}, hasLastCompletedAt=${!!task?.lastCompletedAt}`);
                }
               
 
