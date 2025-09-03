@@ -211,14 +211,8 @@ export default function MyProductsPage() {
     }
   }, [loading]);
 
-  // Immediate check for expired tasks when component loads
+  // Simple immediate check for expired tasks when component loads
   useEffect(() => {
-    console.log(`[DEBUG] Immediate check useEffect triggered:`, {
-      hasUser: !!user,
-      productTasksSize: productTasks.size,
-      productTasks: Array.from(productTasks.entries())
-    });
-    
     if (!user || productTasks.size === 0) return;
 
     const checkExpiredTasks = async () => {
@@ -227,46 +221,16 @@ export default function MyProductsPage() {
         
         for (const [productId, task] of productTasks.entries()) {
           if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            let lastCompletion: Date | null = null;
-
-            if (typeof task.lastCompletedAt === 'string') {
-              lastCompletion = new Date(task.lastCompletedAt);
-            } else if (task.lastCompletedAt instanceof Date) {
-              lastCompletion = task.lastCompletedAt;
-            } else if (
-              task.lastCompletedAt &&
-              typeof task.lastCompletedAt === 'object' &&
-              'seconds' in (task.lastCompletedAt as any)
-            ) {
-              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-            }
-
-            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-              const now = new Date();
-              const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-              
-              console.log(`[DEBUG] Cooldown check for ${productId}:`, {
-                lastCompletion: lastCompletion.toISOString(),
-                now: now.toISOString(),
-                hoursSinceCompletion: hoursSinceCompletion,
-                needsReset: hoursSinceCompletion >= 24,
-                taskCompletedActions: task.completedActions
-              });
-
-              if (hoursSinceCompletion >= 24) {
-                const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-                console.log(`[DEBUG] Reset result for ${productId}:`, resetResult);
-                if (resetResult.wasReset) {
-                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                  console.log(`[DEBUG] Updated task after reset for ${productId}:`, updatedTask);
-                  if (updatedTask) {
-                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                    setTaskStatuses(prev => new Map(prev.set(productId, status)));
-                    console.log(`[DEBUG] Task and status updated for ${productId}`);
-                  }
-                }
-              }
+            // Force reset any task that has completed 5 actions
+            // This will reset the task and allow user to perform actions again
+            await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+            
+            // Get fresh task data
+            const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+            if (updatedTask) {
+              setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+              const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+              setTaskStatuses(prev => new Map(prev.set(productId, status)));
             }
           }
         }
@@ -365,14 +329,8 @@ export default function MyProductsPage() {
     };
   }, [user, purchasedProducts, productTasks]);
 
-  // Auto-unlock tasks after 24 hours (runs every 30 seconds)
+  // Simple background auto-reset (runs every 10 seconds)
   useEffect(() => {
-    console.log(`[DEBUG] Background auto-reset useEffect triggered:`, {
-      hasUser: !!user,
-      productTasksSize: productTasks.size,
-      productTasks: Array.from(productTasks.entries())
-    });
-    
     if (!user || productTasks.size === 0) return;
 
     let isMounted = true;
@@ -383,79 +341,35 @@ export default function MyProductsPage() {
       try {
         const productTaskService = new ProductTaskService();
 
-        // Iterate over all tasks and auto-reset those whose 24h cooldown has expired
+        // Check all tasks and reset any that have completed 5 actions
         for (const [productId, task] of productTasks.entries()) {
           if (!isMounted) break;
 
-          // Only consider tasks that have reached 5 actions and have a lastCompletedAt
           if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            let lastCompletion: Date | null = null;
-
-            if (typeof task.lastCompletedAt === 'string') {
-              lastCompletion = new Date(task.lastCompletedAt);
-            } else if (task.lastCompletedAt instanceof Date) {
-              lastCompletion = task.lastCompletedAt;
-            } else if (
-              task.lastCompletedAt &&
-              typeof task.lastCompletedAt === 'object' &&
-              'seconds' in (task.lastCompletedAt as any)
-            ) {
-              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-            }
-
-                        if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-              const now = new Date();
-              const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-              
-              console.log(`[DEBUG] Background cooldown check for ${productId}:`, {
-                lastCompletion: lastCompletion.toISOString(),
-                now: now.toISOString(),
-                hoursSinceCompletion: hoursSinceCompletion,
-                needsReset: hoursSinceCompletion >= 24,
-                taskCompletedActions: task.completedActions
+            // Force reset the task
+            await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+            
+            // Get fresh task data
+            const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+            if (updatedTask && isMounted) {
+              // Clear action completion states
+              setCompletingActions(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(productId);
+                return newMap;
               });
-
-              // If 24 hours have passed, trigger backend check/reset and refresh this task/status
-              if (hoursSinceCompletion >= 24) {
-                try {
-                  const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-                  
-                  if (resetResult.wasReset && isMounted) {
-                    console.log(`[DEBUG] Background reset triggered for ${productId}`);
-                    // Force refresh the task and status in UI
-                    const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                    console.log(`[DEBUG] Background updated task for ${productId}:`, updatedTask);
-                    if (updatedTask && isMounted) {
-                      // Clear any action completion states for this product
-                      setCompletingActions(prev => {
-                        const newMap = new Map(prev);
-                        newMap.delete(productId);
-                        return newMap;
-                      });
-                      
-                      // Force update task and status with a small delay to ensure proper state sync
-                      setTimeout(() => {
-                        if (isMounted) {
-                          setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                          productTaskService.canCompleteProductTask(user.uid, productId).then(status => {
-                            if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
-                            console.log(`[DEBUG] Background task and status updated for ${productId}`);
-                          });
-                        }
-                      }, 100);
-                    }
-                  }
-                } catch {
-                  // Ignore errors silently in background refresh
-                }
-              }
+              
+              // Update task and status
+              setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+              const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+              if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
             }
           }
         }
       } catch {
-        // Ignore errors silently in background loop
+        // Ignore errors silently
       }
-    }, 10000); // every 10 seconds for faster response
+    }, 10000); // every 10 seconds
 
     return () => {
       isMounted = false;
@@ -972,17 +886,7 @@ export default function MyProductsPage() {
     if (!task) return false;
     
     const actionIndex = task.actionTypes.indexOf(actionType);
-    const isCompleted = task.completedActions > actionIndex;
-    
-    // Debug logging
-    console.log(`[DEBUG] isActionCompleted for ${productId}, ${actionType}:`, {
-      completedActions: task.completedActions,
-      actionIndex,
-      isCompleted,
-      task: task
-    });
-    
-    return isCompleted;
+    return task.completedActions > actionIndex;
   };
 
   const isCycleEnded = (product: PurchasedProduct): boolean => {
