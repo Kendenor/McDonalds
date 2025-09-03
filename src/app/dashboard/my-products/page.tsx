@@ -1007,9 +1007,40 @@ export default function MyProductsPage() {
                               </div>
                               <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
                               
-                              {/* Countdown Display for Special Plans */}
-
-                              
+                              {/* Task Status Banner */}
+                              {task.completedActions === 5 ? (
+                                isLocked ? (
+                                  <div className="p-3 rounded-lg border bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+                                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400">
+                                      <Lock className="h-4 w-4" />
+                                      <span className="font-medium text-sm">🔒 Task Locked - Wait 24 Hours</span>
+                                    </div>
+                                    <p className="text-xs text-orange-500 dark:text-orange-300 text-center mt-1">
+                                      You completed 5 actions. Next cycle available after 24 hours.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
+                                      <CheckCircle className="h-4 w-4" />
+                                      <span className="font-medium text-sm">✅ Task Ready - Complete Daily Task</span>
+                                    </div>
+                                    <p className="text-xs text-green-500 dark:text-green-300 text-center mt-1">
+                                      Actions reset for next cycle! Complete 5 actions again to earn your daily reward.
+                                    </p>
+                                  </div>
+                                )
+                              ) : (
+                                <div className="p-3 rounded-lg border bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                                  <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400">
+                                    <Target className="h-4 w-4" />
+                                    <span className="font-medium text-sm">🎯 Complete {task.requiredActions - task.completedActions} More Actions</span>
+                                  </div>
+                                  <p className="text-xs text-blue-500 dark:text-blue-300 text-center mt-1">
+                                    Complete all 5 actions to unlock daily reward.
+                                  </p>
+                                </div>
+                              )}
 
                             </div>
 
@@ -1032,7 +1063,7 @@ export default function MyProductsPage() {
                                     className={`h-10 text-xs ${isTaskLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
                                     {IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
-                                    {isTaskLocked ? 'Locked' : isActionCompleting ? 'Completing...' : getActionButtonText(product.id, actionType)}
+                                    {isTaskLocked ? '🔒 Locked' : isActionCompleting ? '⏳ Completing...' : getActionButtonText(product.id, actionType)}
                                   </Button>
                                 );
                               })}
@@ -1040,41 +1071,23 @@ export default function MyProductsPage() {
 
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
-                              {/* PRIORITY 1: Show locked message if task is locked for 24 hours */}
-                              {isLocked ? (
-                                      <div className="text-center space-y-3">
-                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                    <Lock className="h-4 w-4" />
-                                    <span className="font-medium">🔒 Task Locked for 24 Hours</span>
-                                        </div>
-                                  <div className="p-4 rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
-                                          <div className="text-center">
-                                      <div className="text-lg font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                        Wait 24 hours to complete tasks again
-                                            </div>
-                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                        You have completed 5 actions. Next cycle available after 24 hours.
-                                            </div>
-                                          </div>
-                                        </div>
-                                          </div>
-                              ) : status?.canComplete ? (
-                                /* PRIORITY 2: Show complete button if task can be completed */
+                              {/* Show complete button if task can be completed and not locked */}
+                              {!isLocked && status?.canComplete ? (
                                 <Button 
                                   onClick={() => handleCompleteTask(product.id)}
-                                  className="w-full"
+                                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                                   size="sm"
                                   disabled={completingTasks.has(product.id)}
                                 >
                                   <Trophy className="h-4 w-4 mr-2" />
-                                  {completingTasks.has(product.id) ? 'Completing...' : `Complete Daily Task (₦${task.dailyReward.toLocaleString()})`}
+                                  {completingTasks.has(product.id) ? '⏳ Completing...' : `🎯 Complete Daily Task (₦${task.dailyReward.toLocaleString()})`}
                                 </Button>
-                              ) : (
-                                /* PRIORITY 3: Show status message if neither countdown nor completion is possible */
-                                <div className="text-center">
-                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
+                              ) : !isLocked ? (
+                                /* Show status message if task cannot be completed */
+                                <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
+                                  <p className="text-sm text-muted-foreground">{status?.message}</p>
                                 </div>
-                              )}
+                              ) : null}
                             </div>
 
                             {/* Task Stats */}
