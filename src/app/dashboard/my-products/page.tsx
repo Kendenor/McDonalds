@@ -215,13 +215,16 @@ export default function MyProductsPage() {
 
     // Simple immediate check for expired tasks when component loads
   useEffect(() => {
-    if (!user || productTasks.size === 0) return;
+    if (!user) return;
 
     const checkExpiredTasks = async () => {
       try {
         const productTaskService = new ProductTaskService();
         
-        for (const [productId, task] of productTasks.entries()) {
+        // Get fresh task data from database instead of using state
+        const tasks = await productTaskService.getUserProductTasks(user.uid);
+        
+        for (const task of tasks) {
           if (task && task.completedActions === 5) {
             // Check if we should reset this task
             let shouldReset = false;
@@ -245,23 +248,23 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-                console.log(`[RESET DEBUG] Task ${productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
+                console.log(`[RESET DEBUG] Task ${task.productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
-                console.log(`[RESET DEBUG] Task ${productId}: Invalid lastCompletedAt, forcing reset`);
+                console.log(`[RESET DEBUG] Task ${task.productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
-              console.log(`[RESET DEBUG] Task ${productId}: No lastCompletedAt, forcing reset`);
+              console.log(`[RESET DEBUG] Task ${task.productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
-              console.log(`[RESET] Resetting task for ${productId} - 24 hours have passed`);
+              console.log(`[RESET] Resetting task for ${task.productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -269,18 +272,13 @@ export default function MyProductsPage() {
                   lastActionTime: null
                 });
                 
-                // Get fresh task data
-                const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                if (updatedTask) {
-                  setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                  const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                  setTaskStatuses(prev => new Map(prev.set(productId, status)));
-                }
+                // Reload all tasks after reset
+                await loadProductTasks(purchasedProducts);
               } catch (error) {
-                console.error(`Failed to reset task for ${productId}:`, error);
+                console.error(`Failed to reset task for ${task.productId}:`, error);
               }
             } else {
-              console.log(`[RESET] Task ${productId} not reset - task is still within 24-hour cooldown`);
+              console.log(`[RESET] Task ${task.productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
@@ -290,7 +288,7 @@ export default function MyProductsPage() {
     };
 
     checkExpiredTasks();
-  }, [user, productTasks.size]); // Run when user changes or when tasks are first loaded
+  }, [user]); // Only run when user changes, not when tasks change
 
   // Auto-check for missing tasks every 3 seconds for Special plans
   useEffect(() => {
@@ -379,9 +377,9 @@ export default function MyProductsPage() {
     };
   }, [user, purchasedProducts, productTasks]);
 
-  // Simple background auto-reset (runs every 10 seconds)
+  // Background auto-reset (runs every 5 minutes to check for expired tasks)
   useEffect(() => {
-    if (!user || productTasks.size === 0) return;
+    if (!user) return;
 
     let isMounted = true;
 
@@ -390,9 +388,12 @@ export default function MyProductsPage() {
 
       try {
         const productTaskService = new ProductTaskService();
+        
+        // Get fresh task data from database
+        const tasks = await productTaskService.getUserProductTasks(user.uid);
 
         // Check all tasks and reset any that have completed 5 actions
-        for (const [productId, task] of productTasks.entries()) {
+        for (const task of tasks) {
           if (!isMounted) break;
 
           if (task && task.completedActions === 5) {
@@ -418,23 +419,23 @@ export default function MyProductsPage() {
               if (lastCompletion && !isNaN(lastCompletion.getTime())) {
                 const now = new Date();
                 const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-                console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
+                console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: lastCompletion=${lastCompletion}, now=${now}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}`);
                 // Only reset if 24 hours have passed
                 shouldReset = hoursSinceCompletion >= 24;
               } else {
-                console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: Invalid lastCompletedAt, forcing reset`);
+                console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: Invalid lastCompletedAt, forcing reset`);
                 // If lastCompletedAt is Invalid Date, force reset
                 shouldReset = true;
               }
             } else {
-              console.log(`[BACKGROUND RESET DEBUG] Task ${productId}: No lastCompletedAt, forcing reset`);
+              console.log(`[BACKGROUND RESET DEBUG] Task ${task.productId}: No lastCompletedAt, forcing reset`);
               // If no lastCompletedAt, force reset
               shouldReset = true;
             }
 
             // Reset the task if needed
             if (shouldReset) {
-              console.log(`[BACKGROUND RESET] Resetting task for ${productId} - 24 hours have passed`);
+              console.log(`[BACKGROUND RESET] Resetting task for ${task.productId} - 24 hours have passed`);
               try {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
@@ -442,39 +443,28 @@ export default function MyProductsPage() {
                   lastActionTime: null
                 });
                 
-                // Get fresh task data
-                const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                if (updatedTask && isMounted) {
-                  // Clear action completion states
-                  setCompletingActions(prev => {
-                    const newMap = new Map(prev);
-                    newMap.delete(productId);
-                    return newMap;
-                  });
-                  
-                  // Update task and status
-                  setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                  const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                  if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                // Reload all tasks after reset
+                if (isMounted) {
+                  await loadProductTasks(purchasedProducts);
                 }
               } catch (error) {
-                console.error(`Failed to reset task for ${productId}:`, error);
+                console.error(`Failed to reset task for ${task.productId}:`, error);
               }
             } else {
-              console.log(`[BACKGROUND RESET] Task ${productId} not reset - task is still within 24-hour cooldown`);
+              console.log(`[BACKGROUND RESET] Task ${task.productId} not reset - task is still within 24-hour cooldown`);
             }
           }
         }
       } catch {
         // Ignore errors silently
       }
-    }, 10000); // every 10 seconds
+    }, 300000); // every 5 minutes (300000ms)
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [user, productTasks]);
+  }, [user]); // Only depend on user, not productTasks to avoid immediate resets
 
   const loadPurchasedProducts = async () => {
     if (!user) {
