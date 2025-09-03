@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserService, ProductService } from '@/lib/user-service';
 import { ProductTaskService } from '@/lib/product-task-service';
 import { auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -220,19 +222,27 @@ export default function MyProductsPage() {
         const productTaskService = new ProductTaskService();
         
         for (const [productId, task] of productTasks.entries()) {
-          if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            // Force reset any task that has completed 5 actions
-            // This will reset the task and allow user to perform actions again
-            await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-            
-            // Get fresh task data
-            const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-            if (updatedTask) {
-              setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-              const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-              setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                      if (task && task.completedActions === 5 && task.lastCompletedAt) {
+              // Force reset any task that has completed 5 actions
+              // Directly update the task in Firestore to reset actions
+              try {
+                await updateDoc(doc(db, 'product_tasks', task.id), {
+                  completedActions: 0,
+                  currentActionStep: 1,
+                  lastActionTime: null
+                });
+                
+                // Get fresh task data
+                const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                if (updatedTask) {
+                  setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                  const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                  setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                }
+              } catch (error) {
+                console.error(`Failed to reset task for ${productId}:`, error);
+              }
             }
-          }
         }
       } catch {
         // Ignore errors silently
@@ -346,23 +356,31 @@ export default function MyProductsPage() {
           if (!isMounted) break;
 
           if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            // Force reset the task
-            await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-            
-            // Get fresh task data
-            const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-            if (updatedTask && isMounted) {
-              // Clear action completion states
-              setCompletingActions(prev => {
-                const newMap = new Map(prev);
-                newMap.delete(productId);
-                return newMap;
+            // Force reset the task directly in Firestore
+            try {
+              await updateDoc(doc(db, 'product_tasks', task.id), {
+                completedActions: 0,
+                currentActionStep: 1,
+                lastActionTime: null
               });
               
-              // Update task and status
-              setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-              const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-              if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+              // Get fresh task data
+              const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+              if (updatedTask && isMounted) {
+                // Clear action completion states
+                setCompletingActions(prev => {
+                  const newMap = new Map(prev);
+                  newMap.delete(productId);
+                  return newMap;
+                });
+                
+                // Update task and status
+                setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+              }
+            } catch (error) {
+              console.error(`Failed to reset task for ${productId}:`, error);
             }
           }
         }
