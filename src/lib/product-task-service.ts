@@ -209,20 +209,9 @@ export class ProductTaskService {
               message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.`, 
               progress: 5 
             };
-          } else {
-            // 24 hours have passed, reset actions for next cycle
-            console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, resetting actions for next cycle`);
-            await updateDoc(doc(db, this.collectionName, task.id), {
-              completedActions: 0,
-              currentActionStep: 1,
-              lastActionTime: null
-            });
-            
-            // Update local task object
-            task.completedActions = 0;
-            task.currentActionStep = 1;
-            task.lastActionTime = null;
           }
+          // Note: We don't reset here anymore - let the frontend handle the reset
+          // to avoid race conditions and immediate resets
         }
       }
 
@@ -584,25 +573,8 @@ export class ProductTaskService {
         } as ProductTask;
       });
 
-      // Check and reset actions for tasks where 24-hour cooldown has expired
-      for (const task of tasks) {
-        if (task.completedActions === 5 && task.lastCompletedAt) {
-          const now = new Date();
-          const lastCompletion = new Date(task.lastCompletedAt);
-          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-          
-          if (hoursRemaining <= 0) {
-            console.log(`[TASK] Auto-resetting actions for ${task.productName} - 24-hour cooldown expired`);
-            await this.checkAndResetActionsAfterCooldown(userId, task.productId);
-            
-            // Update the local task object to reflect the reset
-            task.completedActions = 0;
-            task.currentActionStep = 1;
-            task.lastActionTime = null;
-          }
-        }
-      }
+      // Note: Reset logic is now handled in the frontend to avoid race conditions
+      // and ensure proper 24-hour cooldown enforcement
       
       return tasks;
     } catch (error) {
