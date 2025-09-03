@@ -798,17 +798,27 @@ export default function MyProductsPage() {
       const result = await productTaskService.completeProductTask(user.uid, productId);
       
       if (result.success) {
+        console.log(`[TASK COMPLETION] Task completed successfully for ${productId}`);
+        
         // Update the task in state
         const task = productTasks.get(productId);
         if (task) {
           // Reload the task to get the updated state from database
           const updatedTask = await productTaskService.getProductTask(user.uid, productId);
           if (updatedTask) {
-          setProductTasks(new Map(productTasks.set(productId, updatedTask)));
+            console.log(`[TASK COMPLETION] Updated task data:`, {
+              completedActions: updatedTask.completedActions,
+              lastCompletedAt: updatedTask.lastCompletedAt,
+              totalEarned: updatedTask.totalEarned
+            });
+            
+            setProductTasks(new Map(productTasks.set(productId, updatedTask)));
           
-          // Update task status
-          const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            // Update task status
+            const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+            setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+            
+            console.log(`[TASK COMPLETION] Task status after completion:`, status);
             
             // CRITICAL: Update countdowns immediately after task completion
             // This ensures the timer shows up right away
@@ -1107,10 +1117,17 @@ export default function MyProductsPage() {
                      const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
                      
                      isLocked = hoursSinceCompletion < 24;
+                     
+                     console.log(`[UI LOCK DEBUG] Task ${product.id}: completedActions=${task.completedActions}, lastCompletion=${lastCompletion}, hoursSinceCompletion=${hoursSinceCompletion.toFixed(2)}, isLocked=${isLocked}`);
+                   } else {
+                     console.log(`[UI LOCK DEBUG] Task ${product.id}: Invalid lastCompletion date`);
                    }
                  } catch (error) {
+                   console.log(`[UI LOCK DEBUG] Task ${product.id}: Error calculating lock status:`, error);
                    isLocked = false;
                  }
+               } else {
+                 console.log(`[UI LOCK DEBUG] Task ${product.id}: Not locked - completedActions=${task?.completedActions}, hasLastCompletedAt=${!!task?.lastCompletedAt}`);
                }
               
 
