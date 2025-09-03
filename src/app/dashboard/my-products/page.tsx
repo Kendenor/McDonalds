@@ -223,24 +223,45 @@ export default function MyProductsPage() {
         
         for (const [productId, task] of productTasks.entries()) {
                       if (task && task.completedActions === 5 && task.lastCompletedAt) {
-              // Force reset any task that has completed 5 actions
-              // Directly update the task in Firestore to reset actions
-              try {
-                await updateDoc(doc(db, 'product_tasks', task.id), {
-                  completedActions: 0,
-                  currentActionStep: 1,
-                  lastActionTime: null
-                });
-                
-                // Get fresh task data
-                const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                if (updatedTask) {
-                  setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                  const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                  setTaskStatuses(prev => new Map(prev.set(productId, status)));
+              // Check if 24 hours have passed since last completion
+              let lastCompletion: Date | null = null;
+
+              if (typeof task.lastCompletedAt === 'string') {
+                lastCompletion = new Date(task.lastCompletedAt);
+              } else if (task.lastCompletedAt instanceof Date) {
+                lastCompletion = task.lastCompletedAt;
+              } else if (
+                task.lastCompletedAt &&
+                typeof task.lastCompletedAt === 'object' &&
+                'seconds' in (task.lastCompletedAt as any)
+              ) {
+                lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+              }
+
+              if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                const now = new Date();
+                const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+
+                // Only reset if 24 hours have passed
+                if (hoursSinceCompletion >= 24) {
+                  try {
+                    await updateDoc(doc(db, 'product_tasks', task.id), {
+                      completedActions: 0,
+                      currentActionStep: 1,
+                      lastActionTime: null
+                    });
+                    
+                    // Get fresh task data
+                    const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                    if (updatedTask) {
+                      setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                      const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                      setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                    }
+                  } catch (error) {
+                    console.error(`Failed to reset task for ${productId}:`, error);
+                  }
                 }
-              } catch (error) {
-                console.error(`Failed to reset task for ${productId}:`, error);
               }
             }
         }
@@ -356,31 +377,53 @@ export default function MyProductsPage() {
           if (!isMounted) break;
 
           if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            // Force reset the task directly in Firestore
-            try {
-              await updateDoc(doc(db, 'product_tasks', task.id), {
-                completedActions: 0,
-                currentActionStep: 1,
-                lastActionTime: null
-              });
-              
-              // Get fresh task data
-              const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-              if (updatedTask && isMounted) {
-                // Clear action completion states
-                setCompletingActions(prev => {
-                  const newMap = new Map(prev);
-                  newMap.delete(productId);
-                  return newMap;
-                });
-                
-                // Update task and status
-                setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+            // Check if 24 hours have passed since last completion
+            let lastCompletion: Date | null = null;
+
+            if (typeof task.lastCompletedAt === 'string') {
+              lastCompletion = new Date(task.lastCompletedAt);
+            } else if (task.lastCompletedAt instanceof Date) {
+              lastCompletion = task.lastCompletedAt;
+            } else if (
+              task.lastCompletedAt &&
+              typeof task.lastCompletedAt === 'object' &&
+              'seconds' in (task.lastCompletedAt as any)
+            ) {
+              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+            }
+
+            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+              const now = new Date();
+              const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+
+              // Only reset if 24 hours have passed
+              if (hoursSinceCompletion >= 24) {
+                try {
+                  await updateDoc(doc(db, 'product_tasks', task.id), {
+                    completedActions: 0,
+                    currentActionStep: 1,
+                    lastActionTime: null
+                  });
+                  
+                  // Get fresh task data
+                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                  if (updatedTask && isMounted) {
+                    // Clear action completion states
+                    setCompletingActions(prev => {
+                      const newMap = new Map(prev);
+                      newMap.delete(productId);
+                      return newMap;
+                    });
+                    
+                    // Update task and status
+                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                    if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                  }
+                } catch (error) {
+                  console.error(`Failed to reset task for ${productId}:`, error);
+                }
               }
-            } catch (error) {
-              console.error(`Failed to reset task for ${productId}:`, error);
             }
           }
         }
