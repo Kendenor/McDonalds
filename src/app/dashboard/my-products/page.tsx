@@ -211,6 +211,56 @@ export default function MyProductsPage() {
     }
   }, [loading]);
 
+  // Immediate check for expired tasks when component loads
+  useEffect(() => {
+    if (!user || productTasks.size === 0) return;
+
+    const checkExpiredTasks = async () => {
+      try {
+        const productTaskService = new ProductTaskService();
+        
+        for (const [productId, task] of productTasks.entries()) {
+          if (task && task.completedActions === 5 && task.lastCompletedAt) {
+            let lastCompletion: Date | null = null;
+
+            if (typeof task.lastCompletedAt === 'string') {
+              lastCompletion = new Date(task.lastCompletedAt);
+            } else if (task.lastCompletedAt instanceof Date) {
+              lastCompletion = task.lastCompletedAt;
+            } else if (
+              task.lastCompletedAt &&
+              typeof task.lastCompletedAt === 'object' &&
+              'seconds' in (task.lastCompletedAt as any)
+            ) {
+              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+            }
+
+            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+              const now = new Date();
+              const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+
+              if (hoursSinceCompletion >= 24) {
+                const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+                if (resetResult.wasReset) {
+                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                  if (updatedTask) {
+                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                    setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore errors silently
+      }
+    };
+
+    checkExpiredTasks();
+  }, [user, productTasks.size]); // Run when user changes or when tasks are first loaded
+
   // Auto-check for missing tasks every 3 seconds for Special plans
   useEffect(() => {
     if (!user || purchasedProducts.length === 0) return;
@@ -331,20 +381,35 @@ export default function MyProductsPage() {
             }
 
             if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-              const now = new Date();
+          const now = new Date();
               const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
 
               // If 24 hours have passed, trigger backend check/reset and refresh this task/status
               if (hoursSinceCompletion >= 24) {
                 try {
-                  await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-
-                  // Refresh the task and status in UI
-                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                  if (updatedTask && isMounted) {
-                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                    if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                  const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+                  
+                  if (resetResult.wasReset && isMounted) {
+                    // Force refresh the task and status in UI
+                    const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                    if (updatedTask && isMounted) {
+                      // Clear any action completion states for this product
+                      setCompletingActions(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(productId);
+                        return newMap;
+                      });
+                      
+                      // Force update task and status with a small delay to ensure proper state sync
+                      setTimeout(() => {
+                        if (isMounted) {
+                          setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                          productTaskService.canCompleteProductTask(user.uid, productId).then(status => {
+                            if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                          });
+                        }
+                      }, 100);
+                    }
                   }
                 } catch {
                   // Ignore errors silently in background refresh
@@ -356,7 +421,7 @@ export default function MyProductsPage() {
       } catch {
         // Ignore errors silently in background loop
       }
-    }, 30000); // every 30 seconds
+    }, 10000); // every 10 seconds for faster response
 
     return () => {
       isMounted = false;
@@ -977,12 +1042,12 @@ export default function MyProductsPage() {
           <TabsTrigger value="expired">Expired ({purchasedProducts.filter(p => p.status === 'Completed' && p.daysCompleted >= p.totalDays).length})</TabsTrigger>
         </TabsList>
 
-                 <TabsContent value="active" className="space-y-6">
-           {purchasedProducts
-             .filter(product => product.status === 'Active')
-             .map(product => {
-               const task = productTasks.get(product.id);
-               const status = taskStatuses.get(product.id);
+        <TabsContent value="active" className="space-y-6">
+          {purchasedProducts
+            .filter(product => product.status === 'Active')
+            .map(product => {
+              const task = productTasks.get(product.id);
+              const status = taskStatuses.get(product.id);
                
                // Check if task is locked (completed 5 actions and has lastCompletedAt)
                let isLocked = false;
@@ -1151,7 +1216,7 @@ export default function MyProductsPage() {
                               ) : !isLocked ? (
                                 /* Show status message if task cannot be completed */
                                 <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
-                                  <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
                                 </div>
                               ) : null}
                             </div>
