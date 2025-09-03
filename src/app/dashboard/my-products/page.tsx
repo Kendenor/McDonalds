@@ -222,45 +222,57 @@ export default function MyProductsPage() {
         const productTaskService = new ProductTaskService();
         
         for (const [productId, task] of productTasks.entries()) {
-                      if (task && task.completedActions === 5 && task.lastCompletedAt) {
-              // Check if 24 hours have passed since last completion
-              let lastCompletion: Date | null = null;
+                      if (task && task.completedActions === 5) {
+              // Check if we should reset this task
+              let shouldReset = false;
+              
+              if (task.lastCompletedAt) {
+                // Check if 24 hours have passed since last completion
+                let lastCompletion: Date | null = null;
 
-              if (typeof task.lastCompletedAt === 'string') {
-                lastCompletion = new Date(task.lastCompletedAt);
-              } else if (task.lastCompletedAt instanceof Date) {
-                lastCompletion = task.lastCompletedAt;
-              } else if (
-                task.lastCompletedAt &&
-                typeof task.lastCompletedAt === 'object' &&
-                'seconds' in (task.lastCompletedAt as any)
-              ) {
-                lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                if (typeof task.lastCompletedAt === 'string') {
+                  lastCompletion = new Date(task.lastCompletedAt);
+                } else if (task.lastCompletedAt instanceof Date) {
+                  lastCompletion = task.lastCompletedAt;
+                } else if (
+                  task.lastCompletedAt &&
+                  typeof task.lastCompletedAt === 'object' &&
+                  'seconds' in (task.lastCompletedAt as any)
+                ) {
+                  lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                }
+
+                if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                  const now = new Date();
+                  const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+                  shouldReset = hoursSinceCompletion >= 24;
+                } else {
+                  // If lastCompletedAt is Invalid Date, force reset
+                  shouldReset = true;
+                }
+              } else {
+                // If no lastCompletedAt, force reset
+                shouldReset = true;
               }
 
-              if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-                const now = new Date();
-                const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-
-                // Only reset if 24 hours have passed
-                if (hoursSinceCompletion >= 24) {
-                  try {
-                    await updateDoc(doc(db, 'product_tasks', task.id), {
-                      completedActions: 0,
-                      currentActionStep: 1,
-                      lastActionTime: null
-                    });
-                    
-                    // Get fresh task data
-                    const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                    if (updatedTask) {
-                      setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                      const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                      setTaskStatuses(prev => new Map(prev.set(productId, status)));
-                    }
-                  } catch (error) {
-                    console.error(`Failed to reset task for ${productId}:`, error);
+              // Reset the task if needed
+              if (shouldReset) {
+                try {
+                  await updateDoc(doc(db, 'product_tasks', task.id), {
+                    completedActions: 0,
+                    currentActionStep: 1,
+                    lastActionTime: null
+                  });
+                  
+                  // Get fresh task data
+                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                  if (updatedTask) {
+                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                    setTaskStatuses(prev => new Map(prev.set(productId, status)));
                   }
+                } catch (error) {
+                  console.error(`Failed to reset task for ${productId}:`, error);
                 }
               }
             }
@@ -376,53 +388,65 @@ export default function MyProductsPage() {
         for (const [productId, task] of productTasks.entries()) {
           if (!isMounted) break;
 
-          if (task && task.completedActions === 5 && task.lastCompletedAt) {
-            // Check if 24 hours have passed since last completion
-            let lastCompletion: Date | null = null;
+          if (task && task.completedActions === 5) {
+            // Check if we should reset this task
+            let shouldReset = false;
+            
+            if (task.lastCompletedAt) {
+              // Check if 24 hours have passed since last completion
+              let lastCompletion: Date | null = null;
 
-            if (typeof task.lastCompletedAt === 'string') {
-              lastCompletion = new Date(task.lastCompletedAt);
-            } else if (task.lastCompletedAt instanceof Date) {
-              lastCompletion = task.lastCompletedAt;
-            } else if (
-              task.lastCompletedAt &&
-              typeof task.lastCompletedAt === 'object' &&
-              'seconds' in (task.lastCompletedAt as any)
-            ) {
-              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+              if (typeof task.lastCompletedAt === 'string') {
+                lastCompletion = new Date(task.lastCompletedAt);
+              } else if (task.lastCompletedAt instanceof Date) {
+                lastCompletion = task.lastCompletedAt;
+              } else if (
+                task.lastCompletedAt &&
+                typeof task.lastCompletedAt === 'object' &&
+                'seconds' in (task.lastCompletedAt as any)
+              ) {
+                lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+              }
+
+              if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                const now = new Date();
+                const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+                shouldReset = hoursSinceCompletion >= 24;
+              } else {
+                // If lastCompletedAt is Invalid Date, force reset
+                shouldReset = true;
+              }
+            } else {
+              // If no lastCompletedAt, force reset
+              shouldReset = true;
             }
 
-            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-              const now = new Date();
-              const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
-
-              // Only reset if 24 hours have passed
-              if (hoursSinceCompletion >= 24) {
-                try {
-                  await updateDoc(doc(db, 'product_tasks', task.id), {
-                    completedActions: 0,
-                    currentActionStep: 1,
-                    lastActionTime: null
+            // Reset the task if needed
+            if (shouldReset) {
+              try {
+                await updateDoc(doc(db, 'product_tasks', task.id), {
+                  completedActions: 0,
+                  currentActionStep: 1,
+                  lastActionTime: null
+                });
+                
+                // Get fresh task data
+                const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                if (updatedTask && isMounted) {
+                  // Clear action completion states
+                  setCompletingActions(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(productId);
+                    return newMap;
                   });
                   
-                  // Get fresh task data
-                  const updatedTask = await productTaskService.getProductTask(user.uid, productId);
-                  if (updatedTask && isMounted) {
-                    // Clear action completion states
-                    setCompletingActions(prev => {
-                      const newMap = new Map(prev);
-                      newMap.delete(productId);
-                      return newMap;
-                    });
-                    
-                    // Update task and status
-                    setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
-                    const status = await productTaskService.canCompleteProductTask(user.uid, productId);
-                    if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
-                  }
-                } catch (error) {
-                  console.error(`Failed to reset task for ${productId}:`, error);
+                  // Update task and status
+                  setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
+                  const status = await productTaskService.canCompleteProductTask(user.uid, productId);
+                  if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
                 }
+              } catch (error) {
+                console.error(`Failed to reset task for ${productId}:`, error);
               }
             }
           }
