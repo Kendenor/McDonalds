@@ -13,58 +13,6 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { Clock, CheckCircle, XCircle, AlertCircle, Trophy, Target, Zap, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Custom hook for real-time countdown and auto-reset
-function useSpecialPlanCountdown(task: any, productId: string) {
-  const [isLocked, setIsLocked] = useState(false);
-
-  useEffect(() => {
-    if (!task || !productId) {
-      setIsLocked(false);
-      return;
-    }
-
-    // Check if task is locked (completed 5 actions and has lastCompletedAt)
-    if (task.completedActions === 5 && task.lastCompletedAt) {
-      try {
-        let lastCompletion: Date;
-        
-        if (typeof task.lastCompletedAt === 'string') {
-          lastCompletion = new Date(task.lastCompletedAt);
-        } else if (task.lastCompletedAt instanceof Date) {
-          lastCompletion = task.lastCompletedAt;
-        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-        } else {
-          setIsLocked(false);
-          return;
-        }
-
-        // Check if 24 hours have passed
-        const now = new Date();
-        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-        const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
-        
-        if (hoursSinceCompletion < 24) {
-          setIsLocked(true);
-        } else {
-          setIsLocked(false);
-          // Auto-reset the task if 24 hours have passed
-          if (auth.currentUser?.uid) {
-            const productTaskService = new ProductTaskService();
-            productTaskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
-          }
-        }
-      } catch (error) {
-        setIsLocked(false);
-      }
-    } else {
-      setIsLocked(false);
-    }
-  }, [task, productId]);
-
-  return isLocked;
-}
-
 interface PurchasedProduct {
   id: string;
   userId: string;
@@ -963,13 +911,39 @@ export default function MyProductsPage() {
           <TabsTrigger value="expired">Expired ({purchasedProducts.filter(p => p.status === 'Completed' && p.daysCompleted >= p.totalDays).length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="space-y-6">
-          {purchasedProducts
-            .filter(product => product.status === 'Active')
-            .map(product => {
-              const task = productTasks.get(product.id);
-              const status = taskStatuses.get(product.id);
-              const isLocked = useSpecialPlanCountdown(task, product.id);
+                 <TabsContent value="active" className="space-y-6">
+           {purchasedProducts
+             .filter(product => product.status === 'Active')
+             .map(product => {
+               const task = productTasks.get(product.id);
+               const status = taskStatuses.get(product.id);
+               
+               // Check if task is locked (completed 5 actions and has lastCompletedAt)
+               let isLocked = false;
+               if (task && task.completedActions === 5 && task.lastCompletedAt) {
+                 try {
+                   let lastCompletion: Date | null = null;
+                   
+                   if (typeof task.lastCompletedAt === 'string') {
+                     lastCompletion = new Date(task.lastCompletedAt);
+                   } else if (task.lastCompletedAt instanceof Date) {
+                     lastCompletion = task.lastCompletedAt;
+                   } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                     lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                   }
+                   
+                   if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                     // Check if 24 hours have passed
+                     const now = new Date();
+                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                     const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
+                     
+                     isLocked = hoursSinceCompletion < 24;
+                   }
+                 } catch (error) {
+                   isLocked = false;
+                 }
+               }
               
 
               
@@ -1068,22 +1042,22 @@ export default function MyProductsPage() {
                             <div className="pt-3 border-t">
                               {/* PRIORITY 1: Show locked message if task is locked for 24 hours */}
                               {isLocked ? (
-                                <div className="text-center space-y-3">
-                                  <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                      <div className="text-center space-y-3">
+                                        <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
                                     <Lock className="h-4 w-4" />
                                     <span className="font-medium">🔒 Task Locked for 24 Hours</span>
-                                  </div>
+                                        </div>
                                   <div className="p-4 rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
-                                    <div className="text-center">
+                                          <div className="text-center">
                                       <div className="text-lg font-bold text-orange-600 dark:text-orange-400 mb-1">
                                         Wait 24 hours to complete tasks again
-                                      </div>
-                                      <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                            </div>
+                                            <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
                                         You have completed 5 actions. Next cycle available after 24 hours.
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                          </div>
                               ) : status?.canComplete ? (
                                 /* PRIORITY 2: Show complete button if task can be completed */
                                 <Button 
