@@ -1085,28 +1085,38 @@ export default function MyProductsPage() {
                
                // Check if task is locked (completed 5 actions and has lastCompletedAt)
                let isLocked = false;
-               if (task && task.completedActions === 5 && task.lastCompletedAt) {
-                 try {
-                   let lastCompletion: Date | null = null;
-                   
-                   if (typeof task.lastCompletedAt === 'string') {
-                     lastCompletion = new Date(task.lastCompletedAt);
-                   } else if (task.lastCompletedAt instanceof Date) {
-                     lastCompletion = task.lastCompletedAt;
-                   } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-                     lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-                   }
-                   
-                   if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-                     // Check if 24 hours have passed
-                     const now = new Date();
-                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-                     const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
+               if (task && task.completedActions === 5) {
+                 // If task has completed 5 actions, it should be locked unless 24 hours have passed
+                 if (task.lastCompletedAt) {
+                   try {
+                     let lastCompletion: Date | null = null;
                      
-                     isLocked = hoursSinceCompletion < 24;
+                     if (typeof task.lastCompletedAt === 'string') {
+                       lastCompletion = new Date(task.lastCompletedAt);
+                     } else if (task.lastCompletedAt instanceof Date) {
+                       lastCompletion = task.lastCompletedAt;
+                     } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                       lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                     }
+                     
+                     if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                       // Check if 24 hours have passed
+                       const now = new Date();
+                       const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                       const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
+                       
+                       isLocked = hoursSinceCompletion < 24;
+                     } else {
+                       // If lastCompletedAt is invalid, consider it locked
+                       isLocked = true;
+                     }
+                   } catch (error) {
+                     // If there's an error, consider it locked
+                     isLocked = true;
                    }
-                 } catch (error) {
-                   isLocked = false;
+                 } else {
+                   // If no lastCompletedAt but completed 5 actions, consider it locked
+                   isLocked = true;
                  }
                }
               
