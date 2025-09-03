@@ -15,167 +15,54 @@ import { useToast } from '@/hooks/use-toast';
 
 // Custom hook for real-time countdown and auto-reset
 function useSpecialPlanCountdown(task: any, productId: string) {
-  const [countdown, setCountdown] = useState<{
-    hours: number;
-    minutes: number;
-    seconds: number;
-    isExpired: boolean;
-  } | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
-    console.log('[COUNTDOWN-HOOK] Hook triggered for:', { 
-      productId, 
-      task: task ? { 
-        productName: task.productName, 
-        completedActions: task.completedActions, 
-        lastCompletedAt: task.lastCompletedAt,
-        lastCompletedAtType: typeof task.lastCompletedAt
-      } : null 
-    });
-    
-    try {
-      // Validate task data before proceeding
-      if (!task || !productId || typeof productId !== 'string') {
-        console.log('[COUNTDOWN] Invalid task or productId:', { task, productId });
-        setCountdown(null);
-        return;
-      }
+    if (!task || !productId) {
+      setIsLocked(false);
+      return;
+    }
 
-            console.log('[COUNTDOWN-HOOK] Validation check:', {
-        completedActions: task.completedActions,
-        completedActionsType: typeof task.completedActions,
-        completedActionsEquals5: task.completedActions === 5,
-        hasLastCompletedAt: !!task.lastCompletedAt,
-        lastCompletedAt: task.lastCompletedAt,
-        lastCompletedAtType: typeof task.lastCompletedAt
-      });
-
-      if (task.completedActions !== 5 || !task.lastCompletedAt) {
-        console.log('[COUNTDOWN] Task validation failed:', { 
-          completedActions: task.completedActions,
-          completedActionsType: typeof task.completedActions,
-          completedActionsEquals5: task.completedActions === 5,
-          hasLastCompletedAt: !!task.lastCompletedAt,
-          lastCompletedAt: task.lastCompletedAt,
-          lastCompletedAtType: typeof task.lastCompletedAt
-        });
-        setCountdown(null);
-        return;
-      }
-      
-      console.log('[COUNTDOWN-HOOK] Task validation passed, proceeding with countdown calculation');
-
-      const updateCountdown = () => {
-        console.log('[COUNTDOWN-HOOK] updateCountdown function called');
-        try {
-          const now = new Date();
-          let lastCompletion: Date;
-
-          // Handle different date formats safely
-          console.log('[COUNTDOWN-HOOK] Parsing lastCompletedAt:', {
-            type: typeof task.lastCompletedAt,
-            value: task.lastCompletedAt,
-            isDate: task.lastCompletedAt instanceof Date,
-            hasSeconds: task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt
-          });
-          
-          if (typeof task.lastCompletedAt === 'string') {
-            lastCompletion = new Date(task.lastCompletedAt);
-            console.log('[COUNTDOWN-HOOK] Parsed as string:', lastCompletion);
-          } else if (task.lastCompletedAt instanceof Date) {
-            lastCompletion = task.lastCompletedAt;
-            console.log('[COUNTDOWN-HOOK] Already a Date:', lastCompletion);
-          } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-            // Handle Firestore Timestamp
-            lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-            console.log('[COUNTDOWN-HOOK] Parsed as Firestore Timestamp:', lastCompletion);
-          } else {
-            console.log('[COUNTDOWN] Invalid lastCompletedAt format:', task.lastCompletedAt);
-            return;
-          }
-
-          // Validate the date
-          if (isNaN(lastCompletion.getTime())) {
-            console.log('[COUNTDOWN] Invalid date:', lastCompletion);
-            return;
-          }
-
-          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-          
-          // Check if the task was just completed (within 5 seconds)
-          // If so, start countdown from 24 hours
-          const justCompleted = timeSinceLastCompletion < 5000; // 5 seconds
-          
-          let hoursRemaining: number;
-          if (justCompleted) {
-            // Task was just completed, start countdown from 24 hours
-            hoursRemaining = 24;
-            console.log('[COUNTDOWN-HOOK] Task just completed, starting countdown from 24 hours');
-          } else {
-            // Calculate remaining time based on actual elapsed time
-            hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-            console.log('[COUNTDOWN-HOOK] Calculating remaining time based on elapsed time');
-          }
-
-          console.log(`[COUNTDOWN-HOOK] ${task.productName}:`, {
-            lastCompletion: lastCompletion.toISOString(),
-            now: now.toISOString(),
-            timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-            hoursRemaining,
-            timeSinceLastCompletionMs: timeSinceLastCompletion,
-            justCompleted
-          });
-
-          if (hoursRemaining <= 0) {
-            // Countdown expired, reset the task
-            setCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
-            console.log(`[COUNTDOWN-HOOK] Countdown expired for ${task.productName}`);
-            
-            // Auto-reset the task in the background
-            const resetTask = async () => {
-              try {
-                if (!auth.currentUser?.uid) {
-                  console.log('[COUNTDOWN] No user logged in, skipping auto-reset');
-                  return;
-                }
-                const taskService = new ProductTaskService();
-                await taskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
-                console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
-              } catch (error) {
-                console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
-              }
-            };
-            resetTask();
-          } else {
-            const totalMinutes = Math.floor(hoursRemaining * 60);
-            const hours = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            const totalSeconds = Math.floor(hoursRemaining * 3600);
-            const seconds = totalSeconds % 60;
-            
-            setCountdown({ hours, minutes, seconds, isExpired: false });
-            console.log(`[COUNTDOWN-HOOK] Set countdown for ${task.productName}:`, { hours, minutes, seconds, hoursRemaining });
-          }
-        } catch (error) {
-          console.error('[COUNTDOWN] Error in updateCountdown:', error);
-          setCountdown(null);
+    // Check if task is locked (completed 5 actions and has lastCompletedAt)
+    if (task.completedActions === 5 && task.lastCompletedAt) {
+      try {
+        let lastCompletion: Date;
+        
+        if (typeof task.lastCompletedAt === 'string') {
+          lastCompletion = new Date(task.lastCompletedAt);
+        } else if (task.lastCompletedAt instanceof Date) {
+          lastCompletion = task.lastCompletedAt;
+        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+        } else {
+          setIsLocked(false);
+          return;
         }
-      };
 
-      // Update countdown immediately
-      updateCountdown();
-
-      // Update countdown every second
-      const interval = setInterval(updateCountdown, 1000);
-
-      return () => clearInterval(interval);
-    } catch (error) {
-      console.error('[COUNTDOWN] Hook error:', error);
-      setCountdown(null);
+        // Check if 24 hours have passed
+        const now = new Date();
+        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+        const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
+        
+        if (hoursSinceCompletion < 24) {
+          setIsLocked(true);
+        } else {
+          setIsLocked(false);
+          // Auto-reset the task if 24 hours have passed
+          if (auth.currentUser?.uid) {
+            const productTaskService = new ProductTaskService();
+            productTaskService.checkAndResetActionsAfterCooldown(auth.currentUser.uid, productId);
+          }
+        }
+      } catch (error) {
+        setIsLocked(false);
+      }
+    } else {
+      setIsLocked(false);
     }
   }, [task, productId]);
 
-  return countdown;
+  return isLocked;
 }
 
 interface PurchasedProduct {
@@ -256,7 +143,7 @@ export default function MyProductsPage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [productTasks, setProductTasks] = useState<Map<string, ProductTask>>(new Map());
   const [taskStatuses, setTaskStatuses] = useState<Map<string, TaskStatus>>(new Map());
-  const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number; seconds: number }>>(new Map());
+
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
   const [completingActions, setCompletingActions] = useState<Map<string, Set<string>>>(new Map());
   const [taskMessage, setTaskMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -467,14 +354,7 @@ export default function MyProductsPage() {
   useEffect(() => {
     if (productTasks.size === 0) return;
     
-    const interval = setInterval(() => {
-      updateCountdowns();
-    }, 1000); // Update every second for real-time countdown
-    
-    // Initial update
-    updateCountdowns();
-    
-    return () => clearInterval(interval);
+
   }, [productTasks]);
 
   const loadPurchasedProducts = async () => {
@@ -503,10 +383,7 @@ export default function MyProductsPage() {
       try {
         await loadProductTasks(products);
         
-        // Initialize countdowns after tasks are loaded
-        setTimeout(() => {
-          updateCountdowns();
-        }, 100);
+
         
         // Additional immediate task creation for Special plans
         const specialPlans = products.filter(p => p.planType === 'Special');
@@ -552,10 +429,7 @@ export default function MyProductsPage() {
                     
                     console.log(`[PRODUCTS] New task status set during initial load for ${product.name}:`, status);
                     
-                    // Update countdowns after task creation
-                    setTimeout(() => {
-                      updateCountdowns();
-                    }, 100);
+
                   }
                 } catch (error) {
                   console.error(`[PRODUCTS] Failed to create task during initial load for ${product.name}:`, error);
@@ -698,7 +572,7 @@ export default function MyProductsPage() {
     
     setProductTasks(tasksMap);
     setTaskStatuses(statusesMap);
-    updateCountdowns();
+
     
     // Show notification if tasks were loaded
     if (tasksMap.size > 0) {
@@ -731,166 +605,7 @@ export default function MyProductsPage() {
 
 
 
-  const updateCountdowns = () => {
-    try {
-    const countdownsMap = new Map<string, { hours: number; minutes: number; seconds: number }>();
-    
-    console.log('[COUNTDOWN] Updating countdowns for', productTasks.size, 'tasks');
-    
-    productTasks.forEach((task, productId) => {
-      console.log(`[COUNTDOWN] Checking task for ${task.productName}:`, {
-        completedActions: task.completedActions,
-        lastCompletedAt: task.lastCompletedAt,
-        nextAvailableTime: task.nextAvailableTime
-      });
-      
-      // Check if task is locked (completed actions = 5 and has lastCompletedAt)
-      if (task.completedActions === 5 && task.lastCompletedAt) {
-        // Additional check: if lastCompletedAt is already an Invalid Date, skip it
-        if (task.lastCompletedAt instanceof Date && isNaN(task.lastCompletedAt.getTime())) {
-          console.log(`[COUNTDOWN] Invalid Date detected for ${task.productName}, skipping countdown`);
-          return;
-        }
-        
-        // Additional check: if lastCompletedAt is an object but contains null, skip it
-        if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && JSON.stringify(task.lastCompletedAt) === 'null') {
-          console.log(`[COUNTDOWN] Null object detected for ${task.productName}, skipping countdown`);
-          return;
-        }
-        const now = new Date();
-        let lastCompletion: Date;
-        
-        // Handle different date formats safely
-        if (typeof task.lastCompletedAt === 'string') {
-          lastCompletion = new Date(task.lastCompletedAt);
-        } else if (task.lastCompletedAt instanceof Date) {
-          lastCompletion = task.lastCompletedAt;
-        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-          // Handle Firestore Timestamp
-          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-        } else {
-          console.log(`[COUNTDOWN] Invalid lastCompletedAt format for ${task.productName}:`, task.lastCompletedAt);
-          return;
-        }
-        
-        // Validate the date before using it
-        if (isNaN(lastCompletion.getTime())) {
-          console.log(`[COUNTDOWN] Invalid date created for ${task.productName}:`, {
-            lastCompletedAt: task.lastCompletedAt,
-            lastCompletion: lastCompletion,
-            lastCompletedAtType: typeof task.lastCompletedAt
-          });
-          return;
-        }
-        
-        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-        
-        // If the task was just completed (within 5 seconds), it means the countdown should start from 24 hours
-        // If it's been more than 5 seconds, use the calculated time
-        const adjustedHoursRemaining = timeSinceLastCompletion < 5000 ? 24 : hoursRemaining;
-        
-        console.log(`[COUNTDOWN] Task locked for ${task.productName}:`, {
-          lastCompletion: lastCompletion.toISOString(),
-          now: now.toISOString(),
-          timeSinceLastCompletion: timeSinceLastCompletion / (1000 * 60 * 60),
-          hoursRemaining,
-          adjustedHoursRemaining,
-          completedActions: task.completedActions,
-          hasLastCompletedAt: !!task.lastCompletedAt,
-          lastCompletedAtType: typeof task.lastCompletedAt,
-          lastCompletedAtValue: task.lastCompletedAt,
-          timeSinceLastCompletionMs: timeSinceLastCompletion
-        });
-        
-        if (adjustedHoursRemaining > 0) {
-          const totalMinutes = Math.floor(adjustedHoursRemaining * 60);
-          const hours = Math.floor(totalMinutes / 60);
-          const minutes = totalMinutes % 60;
-          const totalSeconds = Math.floor(adjustedHoursRemaining * 3600);
-          const seconds = totalSeconds % 60;
-          
-          countdownsMap.set(productId, { hours, minutes, seconds });
-          console.log(`[COUNTDOWN] Set countdown for ${task.productName}:`, { 
-            hours, 
-            minutes, 
-            seconds,
-            hoursRemaining,
-            totalMinutes,
-            totalSeconds
-          });
-        } else {
-          console.log(`[COUNTDOWN] Hours remaining is not positive for ${task.productName}: ${hoursRemaining}`);
-          // Clear countdown when time has expired
-          if (countdownsMap.has(productId)) {
-            countdownsMap.delete(productId);
-            console.log(`[COUNTDOWN] Cleared expired countdown for ${task.productName}`);
-          }
-          
-          // Auto-reset the task when countdown expires
-          if (user?.uid) {
-            console.log(`[COUNTDOWN] Auto-resetting task for ${task.productName} as countdown has expired`);
-            const resetTask = async () => {
-              try {
-                const productTaskService = new ProductTaskService();
-                await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
-                console.log(`[COUNTDOWN] Auto-reset completed for ${task.productName}`);
-                
-                // Refresh the task data
-                setTimeout(() => {
-                  loadProductTasks(purchasedProducts);
-                }, 1000);
-              } catch (error) {
-                console.error(`[COUNTDOWN] Auto-reset failed for ${task.productName}:`, error);
-              }
-            };
-            resetTask();
-          }
-        }
-      } else {
-        console.log(`[COUNTDOWN] Task not locked for ${task.productName}:`, {
-          completedActions: task.completedActions,
-          hasLastCompletedAt: !!task.lastCompletedAt
-        });
-      }
-      
-      // Also check nextAvailableTime for legacy support
-      if (task.nextAvailableTime) {
-        try {
-        const now = new Date();
-          
-          // Validate nextAvailableTime before using it
-          if (isNaN(task.nextAvailableTime.getTime())) {
-            console.log(`[COUNTDOWN] Invalid nextAvailableTime for ${task.productName}:`, task.nextAvailableTime);
-            return;
-          }
-          
-        const timeRemaining = task.nextAvailableTime.getTime() - now.getTime();
-        
-        if (timeRemaining > 0) {
-          const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-          const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-            
-            // Only set countdown if we don't already have one from lastCompletedAt
-            if (!countdownsMap.has(productId)) {
-          countdownsMap.set(productId, { hours, minutes, seconds });
-          console.log(`[COUNTDOWN] Set countdown (legacy) for ${task.productName}:`, { hours, minutes, seconds });
-            }
-          }
-        } catch (error) {
-          console.error(`[COUNTDOWN] Error processing nextAvailableTime for ${task.productName}:`, error);
-        }
-      }
-    });
-    
-    console.log('[COUNTDOWN] Final countdowns map:', countdownsMap);
-    setCountdowns(countdownsMap);
-    } catch (error) {
-      console.error('[COUNTDOWN] Error updating countdowns:', error);
-      // Don't set error state here as it's not critical for the main functionality
-    }
-  };
+
 
   const handleCompleteAction = async (productId: string, actionType: string) => {
     if (!user) return;
@@ -1005,21 +720,7 @@ export default function MyProductsPage() {
                 hasLastCompletedAt: !!updatedTask.lastCompletedAt
               });
               
-              if (hoursRemaining > 0) {
-                const hours = Math.floor(hoursRemaining);
-                const minutes = Math.floor((hoursRemaining - hours) * 60);
-                const seconds = Math.floor(((hoursRemaining - hours) * 60 - minutes) * 60);
-                
-                // Set countdown immediately for this task
-                setCountdowns(prev => {
-                  const newCountdowns = new Map(prev);
-                  newCountdowns.set(productId, { hours, minutes, seconds });
-                  console.log(`[IMMEDIATE COUNTDOWN] Set countdown for ${updatedTask.productName}:`, { hours, minutes, seconds });
-                  return newCountdowns;
-                });
-              } else {
-                console.log(`[IMMEDIATE COUNTDOWN] Hours remaining is not positive: ${hoursRemaining}`);
-              }
+
             } else {
               console.log(`[IMMEDIATE COUNTDOWN] Task not ready for countdown:`, {
                 completedActions: updatedTask.completedActions,
@@ -1027,17 +728,7 @@ export default function MyProductsPage() {
               });
             }
             
-            setTimeout(() => {
-              updateCountdowns();
-              // Force a second update after a short delay to ensure countdown is set
-              setTimeout(() => {
-                updateCountdowns();
-              }, 500);
-              // Force a third update after 1 second to ensure countdown is set
-              setTimeout(() => {
-                updateCountdowns();
-              }, 1000);
-            }, 100);
+
             
             // Inform user about reward
             console.log(`Daily task completed! Reward added to your balance. Task locked for 24 hours.`);
@@ -1285,23 +976,9 @@ export default function MyProductsPage() {
             .map(product => {
               const task = productTasks.get(product.id);
               const status = taskStatuses.get(product.id);
-              const countdown = countdowns.get(product.id);
+              const isLocked = useSpecialPlanCountdown(task, product.id);
               
-              // Debug logging for Special plans
-              if (product.planType === 'Special') {
-                console.log(`[PRODUCTS] Special plan ${product.name}:`, {
-                  productId: product.id,
-                  hasTask: !!task,
-                  task: task,
-                  status: status,
-                  productData: {
-                    name: product.name,
-                    planType: product.planType,
-                    status: product.status,
-                    startDate: product.startDate
-                  }
-                });
-              }
+
               
               return (
                 <Card key={product.id} className="overflow-hidden">
@@ -1364,100 +1041,9 @@ export default function MyProductsPage() {
                               <Progress value={(task.completedActions / task.requiredActions) * 100} className="h-2" />
                               
                               {/* Countdown Display for Special Plans */}
-                              {/* Debug: Show countdown info */}
-                              <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
-                                <p>Debug: Task completedActions = {task.completedActions}</p>
-                                <p>Debug: Task lastCompletedAt = {task.lastCompletedAt ? 'exists' : 'null'}</p>
-                                <p>Debug: lastCompletedAt type = {typeof task.lastCompletedAt}</p>
-                                <p>Debug: lastCompletedAt value = {JSON.stringify(task.lastCompletedAt)}</p>
-                                <p>Debug: Countdown from state = {countdown ? JSON.stringify(countdown) : 'null'}</p>
-                                <p>Debug: Should show countdown = {countdown && countdown.hours > 0 ? 'YES' : 'NO'}</p>
-                                <p>Debug: Task validation = {task.completedActions === 5 && task.lastCompletedAt ? 'PASSED' : 'FAILED'}</p>
-                                <button 
-                                  onClick={() => {
-                                    console.log('[DEBUG] Manual countdown update triggered');
-                                    updateCountdowns();
-                                    console.log('[DEBUG] Current countdowns after update:', countdowns);
-                                  }}
-                                  className="mt-2 px-2 py-1 bg-blue-500 text-white text-xs rounded"
-                                >
-                                  Force Update Countdown
-                                </button>
-                              </div>
+
                               
-                              {countdown && countdown.hours > 0 ? (
-                                <div className="text-center space-y-3">
-                                  <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">⏰ Task Locked - Countdown Active</span>
-                                  </div>
-                                  
-                                  {/* Real-time Countdown Display */}
-                                  <div className="p-4 rounded-lg border transition-all duration-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
-                                    <div className="text-center">
-                                      <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                        {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}:{countdown.seconds.toString().padStart(2, '0')}
-                                      </div>
-                                      <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                        Hours : Minutes : Seconds Remaining
-                                      </div>
-                                      {countdown.hours === 0 && countdown.minutes <= 5 && (
-                                        <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
-                                          ⚡ Almost ready! Get prepared for next task cycle!
-                                </div>
-                              )}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Progress Bar for Visual Feedback */}
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                      <span>Time Remaining</span>
-                                      <span>{Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100)}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                        style={{ 
-                                          width: `${Math.max(0, Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100))}%` 
-                                        }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="text-center">
-                                    <p className="text-xs text-muted-foreground">
-                                      🔒 Complete 5 actions again after countdown expires
-                                    </p>
-                                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                      Next task cycle will be available soon!
-                                    </p>
-                                  </div>
-                                  
-                                  {/* Debug Info */}
-                                  <div className="text-xs text-gray-500 border-t pt-2">
-                                    <p>Debug: lastCompletedAt = {task.lastCompletedAt ? new Date(task.lastCompletedAt).toISOString() : 'null'}</p>
-                                    <p>Debug: countdown = {JSON.stringify(countdown)}</p>
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline" 
-                                      onClick={() => {
-                                        console.log('[DEBUG] Task data:', task);
-                                        console.log('[DEBUG] Countdown data:', countdown);
-                                        updateCountdowns();
-                                      }}
-                                    >
-                                      Refresh Countdown
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : task.completedActions === 5 && task.lastCompletedAt ? (
-                                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border">
-                                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                                    ✅ Task ready! You can now complete 5 actions again.
-                                  </p>
-                                </div>
-                              ) : null}
+
                             </div>
 
                             {/* Action Buttons */}
@@ -1465,7 +1051,7 @@ export default function MyProductsPage() {
                               {task.actionTypes.map((actionType, index) => {
                                 const IconComponent = ACTION_ICONS[actionType as keyof typeof ACTION_ICONS];
                                 const isCompleted = isActionCompleted(product.id, actionType);
-                                const isTaskLocked = countdown && countdown.hours > 0; // Task is locked if countdown exists
+                                const isTaskLocked = isLocked; // Task is locked if 24 hours haven't passed
                                 
                                 const isActionCompleting = completingActions.get(product.id)?.has(actionType);
                                 
@@ -1487,84 +1073,24 @@ export default function MyProductsPage() {
 
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
-                              {/* PRIORITY 1: Show countdown if task is locked (completedActions === 5 and has lastCompletedAt) */}
-                                                            {task.completedActions === 5 && task.lastCompletedAt ? (
-                                countdown ? (
-                                  // Show countdown using the hook result
-                                  <div className="text-center space-y-3">
-                                    <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
-                                      <Clock className="h-4 w-4" />
-                                      <span className="font-medium">⏰ Task Locked - Countdown Active</span>
-                                    </div>
-                                    
-                                    {/* Enhanced Countdown Display */}
-                                    <div className={`p-4 rounded-lg border transition-all duration-500 ${
-                                      countdown.hours === 0 && countdown.minutes <= 5 
-                                        ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800 animate-pulse' 
-                                        : 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800'
-                                    }`}>
-                                      <div className="text-center">
-                                        <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                                          {countdown.hours.toString().padStart(2, '0')}:{countdown.minutes.toString().padStart(2, '0')}:{countdown.seconds.toString().padStart(2, '0')}
-                                        </div>
-                                        <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
-                                          Hours : Minutes : Seconds Remaining
-                                        </div>
-                                        {countdown.hours === 0 && countdown.minutes <= 5 && (
-                                          <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1 animate-pulse">
-                                            ⚡ Almost ready! Get prepared for next task cycle!
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Progress Bar for Visual Feedback */}
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between text-xs text-muted-foreground">
-                                        <span>Time Remaining</span>
-                                        <span>{Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100)}%</span>
-                                      </div>
-                                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                        <div 
-                                          className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-1000"
-                                          style={{ 
-                                            width: `${Math.max(0, Math.round((countdown.hours * 60 + countdown.minutes) / 24 / 60 * 100))}%` 
-                                          }}
-                                        ></div>
-                                      </div>
-                                    </div>
-                                    
+                              {/* PRIORITY 1: Show locked message if task is locked for 24 hours */}
+                              {isLocked ? (
+                                <div className="text-center space-y-3">
+                                  <div className="flex items-center justify-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                                    <Lock className="h-4 w-4" />
+                                    <span className="font-medium">🔒 Task Locked for 24 Hours</span>
+                                  </div>
+                                  <div className="p-4 rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-red-800">
                                     <div className="text-center">
-                                      <p className="text-xs text-muted-foreground">
-                                        🔒 Complete 5 actions again after countdown expires
-                                      </p>
-                                      <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                        {countdown.hours === 0 && countdown.minutes <= 5 
-                                          ? '⚡ Next task cycle will be available very soon!' 
-                                          : 'Next task cycle will be available soon!'
-                                        }
+                                      <div className="text-lg font-bold text-orange-600 dark:text-orange-400 mb-1">
+                                        Wait 24 hours to complete tasks again
+                                      </div>
+                                      <div className="text-sm text-orange-500 dark:text-orange-300 font-medium">
+                                        You have completed 5 actions. Next cycle available after 24 hours.
                                       </div>
                                     </div>
                                   </div>
-                                ) : (
-                                  // Countdown hook is null - show task ready
-                                  <div className="text-center space-y-3">
-                                    <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
-                                      <CheckCircle className="h-4 w-4" />
-                                      <span className="font-medium">✅ Task ready!</span>
-                                    </div>
-                                    <div className="p-4 rounded-lg border bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
-                                      <div className="text-center">
-                                        <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-1">
-                                          You can now complete 5 actions again.
-                                        </div>
-                                        <div className="text-sm text-green-500 dark:text-green-300 font-medium">
-                                          Daily task cycle is ready!
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
+                                </div>
                               ) : status?.canComplete ? (
                                 /* PRIORITY 2: Show complete button if task can be completed */
                                 <Button 
@@ -1596,36 +1122,7 @@ export default function MyProductsPage() {
                               </div>
                             </div>
                             
-                            {/* Debug Info - Remove in production */}
-                            {process.env.NODE_ENV === 'development' && (
-                              <div className="pt-3 border-t">
-                                <details className="text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer">Debug Info</summary>
-                                  <div className="mt-2 space-y-1 text-left">
-                                    <p>completedActions: {task.completedActions}</p>
-                                    <p>lastCompletedAt: {task.lastCompletedAt ? new Date(task.lastCompletedAt).toISOString() : 'null'}</p>
-                                    <p>countdown: {countdown ? `${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s` : 'null'}</p>
-                                    <p>status.canComplete: {status?.canComplete ? 'true' : 'false'}</p>
-                                    <p>status.message: {status?.message}</p>
-                                    <p>Task Locked: {task.completedActions === 5 && task.lastCompletedAt ? 'YES' : 'NO'}</p>
-                                    <p>Countdown Ready: {countdown ? 'YES' : 'NO'}</p>
-                                  </div>
-                                  <div className="mt-2">
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      onClick={() => {
-                                        console.log('[DEBUG] Current task state:', task);
-                                        console.log('[DEBUG] Current countdowns:', countdowns);
-                                        updateCountdowns();
-                                      }}
-                                    >
-                                      Test Countdown
-                                    </Button>
-                                  </div>
-                                </details>
-                              </div>
-                            )}
+
                           </>
                           ) : (
                             // Special plan but no task - show loading or error state
