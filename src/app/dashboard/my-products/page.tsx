@@ -238,6 +238,14 @@ export default function MyProductsPage() {
             if (lastCompletion && !isNaN(lastCompletion.getTime())) {
               const now = new Date();
               const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+              
+              console.log(`[DEBUG] Cooldown check for ${productId}:`, {
+                lastCompletion: lastCompletion.toISOString(),
+                now: now.toISOString(),
+                hoursSinceCompletion: hoursSinceCompletion,
+                needsReset: hoursSinceCompletion >= 24,
+                taskCompletedActions: task.completedActions
+              });
 
               if (hoursSinceCompletion >= 24) {
                 const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
@@ -383,9 +391,17 @@ export default function MyProductsPage() {
               lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
             }
 
-            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-          const now = new Date();
+                        if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+              const now = new Date();
               const hoursSinceCompletion = (now.getTime() - lastCompletion.getTime()) / (1000 * 60 * 60);
+              
+              console.log(`[DEBUG] Background cooldown check for ${productId}:`, {
+                lastCompletion: lastCompletion.toISOString(),
+                now: now.toISOString(),
+                hoursSinceCompletion: hoursSinceCompletion,
+                needsReset: hoursSinceCompletion >= 24,
+                taskCompletedActions: task.completedActions
+              });
 
               // If 24 hours have passed, trigger backend check/reset and refresh this task/status
               if (hoursSinceCompletion >= 24) {
