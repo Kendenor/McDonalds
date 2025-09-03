@@ -213,6 +213,12 @@ export default function MyProductsPage() {
 
   // Immediate check for expired tasks when component loads
   useEffect(() => {
+    console.log(`[DEBUG] Immediate check useEffect triggered:`, {
+      hasUser: !!user,
+      productTasksSize: productTasks.size,
+      productTasks: Array.from(productTasks.entries())
+    });
+    
     if (!user || productTasks.size === 0) return;
 
     const checkExpiredTasks = async () => {
@@ -361,6 +367,12 @@ export default function MyProductsPage() {
 
   // Auto-unlock tasks after 24 hours (runs every 30 seconds)
   useEffect(() => {
+    console.log(`[DEBUG] Background auto-reset useEffect triggered:`, {
+      hasUser: !!user,
+      productTasksSize: productTasks.size,
+      productTasks: Array.from(productTasks.entries())
+    });
+    
     if (!user || productTasks.size === 0) return;
 
     let isMounted = true;
