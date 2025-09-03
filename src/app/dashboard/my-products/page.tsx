@@ -241,12 +241,15 @@ export default function MyProductsPage() {
 
               if (hoursSinceCompletion >= 24) {
                 const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
+                console.log(`[DEBUG] Reset result for ${productId}:`, resetResult);
                 if (resetResult.wasReset) {
                   const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                  console.log(`[DEBUG] Updated task after reset for ${productId}:`, updatedTask);
                   if (updatedTask) {
                     setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
                     const status = await productTaskService.canCompleteProductTask(user.uid, productId);
                     setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                    console.log(`[DEBUG] Task and status updated for ${productId}`);
                   }
                 }
               }
@@ -390,8 +393,10 @@ export default function MyProductsPage() {
                   const resetResult = await productTaskService.checkAndResetActionsAfterCooldown(user.uid, productId);
                   
                   if (resetResult.wasReset && isMounted) {
+                    console.log(`[DEBUG] Background reset triggered for ${productId}`);
                     // Force refresh the task and status in UI
                     const updatedTask = await productTaskService.getProductTask(user.uid, productId);
+                    console.log(`[DEBUG] Background updated task for ${productId}:`, updatedTask);
                     if (updatedTask && isMounted) {
                       // Clear any action completion states for this product
                       setCompletingActions(prev => {
@@ -406,6 +411,7 @@ export default function MyProductsPage() {
                           setProductTasks(prev => new Map(prev.set(productId, updatedTask)));
                           productTaskService.canCompleteProductTask(user.uid, productId).then(status => {
                             if (isMounted) setTaskStatuses(prev => new Map(prev.set(productId, status)));
+                            console.log(`[DEBUG] Background task and status updated for ${productId}`);
                           });
                         }
                       }, 100);
@@ -938,7 +944,17 @@ export default function MyProductsPage() {
     if (!task) return false;
     
     const actionIndex = task.actionTypes.indexOf(actionType);
-    return task.completedActions > actionIndex;
+    const isCompleted = task.completedActions > actionIndex;
+    
+    // Debug logging
+    console.log(`[DEBUG] isActionCompleted for ${productId}, ${actionType}:`, {
+      completedActions: task.completedActions,
+      actionIndex,
+      isCompleted,
+      task: task
+    });
+    
+    return isCompleted;
   };
 
   const isCycleEnded = (product: PurchasedProduct): boolean => {
