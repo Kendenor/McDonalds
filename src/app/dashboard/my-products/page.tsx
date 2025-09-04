@@ -98,6 +98,9 @@ export default function MyProductsPage() {
   const [completingActions, setCompletingActions] = useState<Map<string, Set<string>>>(new Map());
   const [taskMessage, setTaskMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Countdown timer state
+  const [countdowns, setCountdowns] = useState<Map<string, { hours: number; minutes: number; seconds: number }>>(new Map());
 
   useEffect(() => {
     try {
@@ -283,6 +286,49 @@ export default function MyProductsPage() {
 
     checkExpiredTasks();
   }, [user]); // Only run when user changes, not when tasks change
+
+  // Countdown timer effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newCountdowns = new Map();
+      
+      productTasks.forEach((task, productId) => {
+        if (task.completedActions === 5 && task.lastCompletedAt) {
+          try {
+            let lastCompletion: Date | null = null;
+            
+            if (typeof task.lastCompletedAt === 'string') {
+              lastCompletion = new Date(task.lastCompletedAt);
+            } else if (task.lastCompletedAt instanceof Date) {
+              lastCompletion = task.lastCompletedAt;
+            } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+              lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+            }
+            
+            if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+              const now = new Date();
+              const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+              const totalSecondsRemaining = (24 * 60 * 60) - (timeSinceLastCompletion / 1000);
+              
+              if (totalSecondsRemaining > 0) {
+                const hours = Math.floor(totalSecondsRemaining / 3600);
+                const minutes = Math.floor((totalSecondsRemaining % 3600) / 60);
+                const seconds = Math.floor(totalSecondsRemaining % 60);
+                
+                newCountdowns.set(productId, { hours, minutes, seconds });
+              }
+            }
+          } catch (error) {
+            console.error('Error calculating countdown:', error);
+          }
+        }
+      });
+      
+      setCountdowns(newCountdowns);
+    }, 1000); // Update every second
+    
+    return () => clearInterval(interval);
+  }, [productTasks]);
 
   // Auto-check for missing tasks every 3 seconds for Special plans
   useEffect(() => {
@@ -1085,37 +1131,32 @@ export default function MyProductsPage() {
                
                // Check if task is locked (completed 5 actions and has lastCompletedAt)
                let isLocked = false;
-               if (task && task.completedActions === 5) {
-                 // If task has completed 5 actions, it should be locked unless 24 hours have passed
-                 if (task.lastCompletedAt) {
-                   try {
-                     let lastCompletion: Date | null = null;
+               if (task && task.completedActions === 5 && task.lastCompletedAt) {
+                 // Only consider locked if there's a lastCompletedAt timestamp (meaning task was actually completed)
+                 try {
+                   let lastCompletion: Date | null = null;
+                   
+                   if (typeof task.lastCompletedAt === 'string') {
+                     lastCompletion = new Date(task.lastCompletedAt);
+                   } else if (task.lastCompletedAt instanceof Date) {
+                     lastCompletion = task.lastCompletedAt;
+                   } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                     lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                   }
+                   
+                   if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                     // Check if 24 hours have passed
+                     const now = new Date();
+                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                     const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
                      
-                     if (typeof task.lastCompletedAt === 'string') {
-                       lastCompletion = new Date(task.lastCompletedAt);
-                     } else if (task.lastCompletedAt instanceof Date) {
-                       lastCompletion = task.lastCompletedAt;
-                     } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-                       lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
-                     }
-                     
-                     if (lastCompletion && !isNaN(lastCompletion.getTime())) {
-                       // Check if 24 hours have passed
-                       const now = new Date();
-                       const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-                       const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
-                       
-                       isLocked = hoursSinceCompletion < 24;
-                     } else {
-                       // If lastCompletedAt is invalid, consider it locked
-                       isLocked = true;
-                     }
-                   } catch (error) {
-                     // If there's an error, consider it locked
+                     isLocked = hoursSinceCompletion < 24;
+                   } else {
+                     // If lastCompletedAt is invalid, consider it locked
                      isLocked = true;
                    }
-                 } else {
-                   // If no lastCompletedAt but completed 5 actions, consider it locked
+                 } catch (error) {
+                   // If there's an error, consider it locked
                    isLocked = true;
                  }
                }
@@ -1193,6 +1234,14 @@ export default function MyProductsPage() {
                                     <p className="text-xs text-orange-500 dark:text-orange-300 text-center mt-1">
                                       You completed 5 actions. Next cycle available after 24 hours.
                                     </p>
+                                    {/* Countdown Timer */}
+                                    {countdowns.has(product.id) && (
+                                      <div className="mt-2 text-center">
+                                        <p className="text-xs text-orange-600 dark:text-orange-400 font-mono">
+                                          Time Remaining: {countdowns.get(product.id)?.hours.toString().padStart(2, '0')}:{countdowns.get(product.id)?.minutes.toString().padStart(2, '0')}:{countdowns.get(product.id)?.seconds.toString().padStart(2, '0')}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
