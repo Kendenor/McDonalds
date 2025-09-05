@@ -1376,8 +1376,8 @@ export default function MyProductsPage() {
 
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
-                              {/* Show complete button if task has 5 completed actions and not locked */}
-                              {!isLocked && task.completedActions === 5 ? (
+                              {/* Show complete button only if backend says it can be completed */}
+                              {!isLocked && task.completedActions === 5 && status?.canComplete ? (
                                 <Button 
                                   onClick={() => handleCompleteTask(product.id)}
                                   className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -1387,12 +1387,12 @@ export default function MyProductsPage() {
                                   <Trophy className="h-4 w-4 mr-2" />
                                   {completingTasks.has(product.id) ? '⏳ Completing...' : `🎯 Complete Daily Task (₦${task.dailyReward.toLocaleString()})`}
                                 </Button>
-                              ) : !isLocked ? (
+                              ) : (
                                 /* Show status message if task cannot be completed */
                                 <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
-                                    <p className="text-sm text-muted-foreground">{status?.message}</p>
+                                    <p className="text-sm text-muted-foreground">{status?.message || 'Complete 5 actions to unlock daily reward'}</p>
                                 </div>
-                              ) : null}
+                              )}
                             </div>
 
                             {/* Task Stats */}

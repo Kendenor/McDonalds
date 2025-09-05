@@ -281,34 +281,62 @@ export class ProductTaskService {
         };
       }
 
-      // STRICT 24-hour cooldown check
-      if (task.lastCompletedAt) {
-        const now = new Date();
-        let lastCompletion: Date;
-        
-        // Handle different timestamp formats
-        if (typeof task.lastCompletedAt === 'string') {
-          lastCompletion = new Date(task.lastCompletedAt);
-        } else if (task.lastCompletedAt instanceof Date) {
-          lastCompletion = task.lastCompletedAt;
-        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
-          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+      // If all actions are completed (5/5), check if 24-hour cooldown has expired
+      if (task.completedActions === 5) {
+        if (task.lastCompletedAt) {
+          const now = new Date();
+          let lastCompletion: Date;
+          
+          // Handle different timestamp formats
+          if (typeof task.lastCompletedAt === 'string') {
+            lastCompletion = new Date(task.lastCompletedAt);
+          } else if (task.lastCompletedAt instanceof Date) {
+            lastCompletion = task.lastCompletedAt;
+          } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+            lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+          } else {
+            lastCompletion = new Date(task.lastCompletedAt);
+          }
+          
+          const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+          const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
+          
+          console.log(`[TASK] Cooldown check: Last completion: ${lastCompletion.toISOString()}, Now: ${now.toISOString()}, Hours remaining: ${hoursRemaining}`);
+          
+          if (hoursRemaining > 0) {
+            const hours = Math.floor(hoursRemaining);
+            const minutes = Math.floor((hoursRemaining - hours) * 60);
+            return { 
+              success: false, 
+              message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.` 
+            };
+          } else {
+            // 24 hours have passed, reset actions for next cycle
+            console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, resetting actions for next cycle`);
+            try {
+              await updateDoc(doc(db, this.collectionName, task.id), {
+                completedActions: 0,
+                currentActionStep: 1,
+                lastActionTime: null
+              });
+              
+              // Return success with reset message
+              return { 
+                success: true, 
+                message: `Actions reset for next cycle! Complete 5 actions again to earn your daily reward.`,
+                reward: 0
+              };
+            } catch (e) {
+              console.error('[TASK] Failed to reset actions on cooldown expiry:', e);
+              return { 
+                success: false, 
+                message: `Failed to reset actions. Please try again.` 
+              };
+            }
+          }
         } else {
-          lastCompletion = new Date(task.lastCompletedAt);
-        }
-        
-        const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
-        const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
-        
-        console.log(`[TASK] Cooldown check: Last completion: ${lastCompletion.toISOString()}, Now: ${now.toISOString()}, Hours remaining: ${hoursRemaining}`);
-        
-        if (hoursRemaining > 0) {
-          const hours = Math.floor(hoursRemaining);
-          const minutes = Math.floor((hoursRemaining - hours) * 60);
-          return { 
-            success: false, 
-            message: `Task locked for ${hours}h ${minutes}m. Complete again in 24 hours.` 
-          };
+          // First time completing task - allow completion
+          console.log(`[TASK] First time completing task for ${task.productName}`);
         }
       }
 
