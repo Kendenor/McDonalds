@@ -1199,6 +1199,39 @@ export default function MyProductsPage() {
                    console.log(`[DEBUG] Error parsing lastCompletedAt for ${product.name}:`, error);
                    isLocked = true;
                  }
+               } else if (task && task.completedActions === 0 && task.lastCompletedAt) {
+                 // Task was reset by backend but still has lastCompletedAt - check if it should be locked
+                 try {
+                   let lastCompletion: Date | null = null;
+                   
+                   if (typeof task.lastCompletedAt === 'string') {
+                     lastCompletion = new Date(task.lastCompletedAt);
+                   } else if (task.lastCompletedAt instanceof Date) {
+                     lastCompletion = task.lastCompletedAt;
+                   } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+                     lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+                   }
+                   
+                   if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                     const now = new Date();
+                     const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                     const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
+                     
+                     // If less than 24 hours have passed since last completion, task should still be locked
+                     isLocked = hoursSinceCompletion < 24;
+                     
+                     console.log(`[DEBUG] Reset task ${product.name}:`, {
+                       lastCompletedAt: task.lastCompletedAt,
+                       lastCompletion: lastCompletion.toISOString(),
+                       now: now.toISOString(),
+                       hoursSinceCompletion,
+                       isLocked: isLocked
+                     });
+                   }
+                 } catch (error) {
+                   console.log(`[DEBUG] Error parsing reset task lastCompletedAt for ${product.name}:`, error);
+                   isLocked = false; // If error, assume task is ready
+                 }
                }
               
 
