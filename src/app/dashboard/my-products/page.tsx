@@ -268,7 +268,8 @@ export default function MyProductsPage() {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
                   currentActionStep: 1,
-                  lastActionTime: null
+                  lastActionTime: null,
+                  lastCompletedAt: null  // Clear the completion timestamp so user can complete again
                 });
                 
                 // Reload all tasks after reset
@@ -476,7 +477,8 @@ export default function MyProductsPage() {
                 await updateDoc(doc(db, 'product_tasks', task.id), {
                   completedActions: 0,
                   currentActionStep: 1,
-                  lastActionTime: null
+                  lastActionTime: null,
+                  lastCompletedAt: null  // Clear the completion timestamp so user can complete again
                 });
                 
                 // Reload all tasks after reset

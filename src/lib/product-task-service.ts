@@ -317,7 +317,8 @@ export class ProductTaskService {
               await updateDoc(doc(db, this.collectionName, task.id), {
                 completedActions: 0,
                 currentActionStep: 1,
-                lastActionTime: null
+                lastActionTime: null,
+                lastCompletedAt: null  // Clear the completion timestamp so user can complete again
               });
               
               // Return success with reset message
@@ -481,7 +482,8 @@ export class ProductTaskService {
               await updateDoc(doc(db, this.collectionName, task.id), {
                 completedActions: 0,
                 currentActionStep: 1,
-                lastActionTime: null
+                lastActionTime: null,
+                lastCompletedAt: null  // Clear the completion timestamp so user can complete again
               });
             } catch (e) {
               console.error('[TASK] Failed to reset actions on cooldown expiry during status check:', e);
