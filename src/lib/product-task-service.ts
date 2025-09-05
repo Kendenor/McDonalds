@@ -141,15 +141,29 @@ export class ProductTaskService {
         const data = taskDoc.data();
         console.log(`[TASK] Task data retrieved:`, data);
         
-        // Handle date conversions properly - support both Firestore Timestamp and regular Date objects
+        // Handle different timestamp formats properly
+        const parseTimestamp = (timestamp: any): Date | null => {
+          if (!timestamp) return null;
+          
+          // If it's a Firestore Timestamp
+          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+          }
+          
+          // If it's our custom {seconds, nanoseconds} object
+          if (timestamp.seconds && typeof timestamp.seconds === 'number') {
+            return new Date(timestamp.seconds * 1000);
+          }
+          
+          // If it's already a Date object or string
+          return new Date(timestamp);
+        };
+        
         const task = {
           ...data,
-          lastCompletedAt: data.lastCompletedAt ? 
-            (data.lastCompletedAt.toDate ? data.lastCompletedAt.toDate() : new Date(data.lastCompletedAt)) : null,
-          nextAvailableTime: data.nextAvailableTime ? 
-            (data.nextAvailableTime.toDate ? data.nextAvailableTime.toDate() : new Date(data.nextAvailableTime)) : null,
-          lastActionTime: data.lastActionTime ? 
-            (data.lastActionTime.toDate ? data.lastActionTime.toDate() : new Date(data.lastActionTime)) : null
+          lastCompletedAt: parseTimestamp(data.lastCompletedAt),
+          nextAvailableTime: parseTimestamp(data.nextAvailableTime),
+          lastActionTime: parseTimestamp(data.lastActionTime)
         } as ProductTask;
         
         console.log(`[TASK] Raw data from Firestore:`, data);
@@ -574,11 +588,30 @@ export class ProductTaskService {
       
       const tasks = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        
+        // Handle different timestamp formats properly
+        const parseTimestamp = (timestamp: any): Date | null => {
+          if (!timestamp) return null;
+          
+          // If it's a Firestore Timestamp
+          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+          }
+          
+          // If it's our custom {seconds, nanoseconds} object
+          if (timestamp.seconds && typeof timestamp.seconds === 'number') {
+            return new Date(timestamp.seconds * 1000);
+          }
+          
+          // If it's already a Date object or string
+          return new Date(timestamp);
+        };
+        
         return {
           ...data,
-          lastCompletedAt: data.lastCompletedAt ? new Date(data.lastCompletedAt.toDate()) : null,
-          nextAvailableTime: data.nextAvailableTime ? new Date(data.nextAvailableTime.toDate()) : null,
-          lastActionTime: data.lastActionTime ? new Date(data.lastActionTime.toDate()) : null
+          lastCompletedAt: parseTimestamp(data.lastCompletedAt),
+          nextAvailableTime: parseTimestamp(data.nextAvailableTime),
+          lastActionTime: parseTimestamp(data.lastActionTime)
         } as ProductTask;
       });
 

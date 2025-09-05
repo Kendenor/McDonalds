@@ -1150,13 +1150,24 @@ export default function MyProductsPage() {
                      const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
                      const hoursSinceCompletion = timeSinceLastCompletion / (1000 * 60 * 60);
                      
+                     // Debug logging for troubleshooting
+                     console.log(`[DEBUG] Task ${product.name}:`, {
+                       lastCompletedAt: task.lastCompletedAt,
+                       lastCompletion: lastCompletion.toISOString(),
+                       now: now.toISOString(),
+                       hoursSinceCompletion,
+                       isLocked: hoursSinceCompletion < 24
+                     });
+                     
                      isLocked = hoursSinceCompletion < 24;
                    } else {
                      // If lastCompletedAt is invalid, consider it locked
+                     console.log(`[DEBUG] Invalid lastCompletedAt for ${product.name}:`, task.lastCompletedAt);
                      isLocked = true;
                    }
                  } catch (error) {
                    // If there's an error, consider it locked
+                   console.log(`[DEBUG] Error parsing lastCompletedAt for ${product.name}:`, error);
                    isLocked = true;
                  }
                }
