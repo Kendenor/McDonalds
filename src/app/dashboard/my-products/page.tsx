@@ -1313,8 +1313,8 @@ export default function MyProductsPage() {
                                         <p className="text-xs text-orange-600 dark:text-orange-400 font-mono">
                                           Time Remaining: {countdowns.get(product.id)?.hours.toString().padStart(2, '0')}:{countdowns.get(product.id)?.minutes.toString().padStart(2, '0')}:{countdowns.get(product.id)?.seconds.toString().padStart(2, '0')}
                                         </p>
-                                      </div>
-                                    )}
+                                </div>
+                              )}
                                   </div>
                                 ) : (
                                   <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
@@ -1368,8 +1368,8 @@ export default function MyProductsPage() {
 
                             {/* Task Completion */}
                             <div className="pt-3 border-t">
-                              {/* Show complete button if task can be completed and not locked */}
-                              {!isLocked && status?.canComplete ? (
+                              {/* Show complete button if task has 5 completed actions and not locked */}
+                              {!isLocked && task.completedActions === 5 ? (
                                 <Button 
                                   onClick={() => handleCompleteTask(product.id)}
                                   className="w-full bg-green-600 hover:bg-green-700 text-white"
