@@ -881,7 +881,8 @@ export default function MyProductsPage() {
                 }
               }
             } else {
-          setTaskStatuses(new Map(taskStatuses.set(productId, status)));
+              // Task was reset by backend (actions = 0), use the backend status
+              setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             }
             
             // Immediate countdown calculation for this specific task
