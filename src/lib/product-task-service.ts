@@ -284,11 +284,23 @@ export class ProductTaskService {
       // STRICT 24-hour cooldown check
       if (task.lastCompletedAt) {
         const now = new Date();
-        const lastCompletion = new Date(task.lastCompletedAt);
+        let lastCompletion: Date;
+        
+        // Handle different timestamp formats
+        if (typeof task.lastCompletedAt === 'string') {
+          lastCompletion = new Date(task.lastCompletedAt);
+        } else if (task.lastCompletedAt instanceof Date) {
+          lastCompletion = task.lastCompletedAt;
+        } else if (task.lastCompletedAt && typeof task.lastCompletedAt === 'object' && 'seconds' in task.lastCompletedAt) {
+          lastCompletion = new Date((task.lastCompletedAt as any).seconds * 1000);
+        } else {
+          lastCompletion = new Date(task.lastCompletedAt);
+        }
+        
         const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
         const hoursRemaining = 24 - (timeSinceLastCompletion / (1000 * 60 * 60));
         
-        console.log(`[TASK] Cooldown check: Last completion: ${lastCompletion}, Now: ${now}, Hours remaining: ${hoursRemaining}`);
+        console.log(`[TASK] Cooldown check: Last completion: ${lastCompletion.toISOString()}, Now: ${now.toISOString()}, Hours remaining: ${hoursRemaining}`);
         
         if (hoursRemaining > 0) {
           const hours = Math.floor(hoursRemaining);

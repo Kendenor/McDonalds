@@ -922,17 +922,25 @@ export default function MyProductsPage() {
         setTaskMessage({ type: 'success', message: result.message });
         setTimeout(() => setTaskMessage(null), 5000); // Clear after 5 seconds
       } else {
-        // Show error message to user with debug info
+        // Show user-friendly error message
         const currentTask = productTasks.get(productId);
-        const debugInfo = currentTask ? 
-          ` (Actions: ${currentTask.completedActions}/${currentTask.requiredActions}, Last Completed: ${currentTask.lastCompletedAt ? new Date(currentTask.lastCompletedAt).toISOString() : 'Never'})` : 
-          '';
+        let userFriendlyMessage = result.message;
+        
+        // Convert technical messages to user-friendly ones
+        if (result.message.includes('Complete') && result.message.includes('more action')) {
+          const remaining = currentTask ? currentTask.requiredActions - currentTask.completedActions : 0;
+          userFriendlyMessage = `Complete ${remaining} more action${remaining > 1 ? 's' : ''} to earn your daily reward`;
+        } else if (result.message.includes('Task locked')) {
+          userFriendlyMessage = 'Task is locked for 24 hours. Please wait before completing again.';
+        } else if (result.message.includes('Task not found')) {
+          userFriendlyMessage = 'Task not found. Please refresh the page and try again.';
+        }
         
         setTaskMessage({ 
           type: 'error', 
-          message: `${result.message}${debugInfo}` 
+          message: userFriendlyMessage 
         });
-        setTimeout(() => setTaskMessage(null), 8000); // Clear after 8 seconds for longer debug info
+        setTimeout(() => setTaskMessage(null), 5000);
       }
     } catch (error) {
       console.error('Failed to complete task:', error);
