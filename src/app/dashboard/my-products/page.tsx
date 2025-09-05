@@ -852,6 +852,34 @@ export default function MyProductsPage() {
                 remainingActions: 0
               };
               setTaskStatuses(new Map(taskStatuses.set(productId, lockedStatus)));
+              
+              // Force immediate countdown calculation for this task
+              if (updatedTask.lastCompletedAt) {
+                const now = new Date();
+                let lastCompletion: Date | null = null;
+                
+                if (typeof updatedTask.lastCompletedAt === 'string') {
+                  lastCompletion = new Date(updatedTask.lastCompletedAt);
+                } else if (updatedTask.lastCompletedAt instanceof Date) {
+                  lastCompletion = updatedTask.lastCompletedAt;
+                } else if (updatedTask.lastCompletedAt && typeof updatedTask.lastCompletedAt === 'object' && 'seconds' in updatedTask.lastCompletedAt) {
+                  lastCompletion = new Date((updatedTask.lastCompletedAt as any).seconds * 1000);
+                }
+                
+                if (lastCompletion && !isNaN(lastCompletion.getTime())) {
+                  const timeSinceLastCompletion = now.getTime() - lastCompletion.getTime();
+                  const totalSecondsRemaining = (24 * 60 * 60) - (timeSinceLastCompletion / 1000);
+                  
+                  if (totalSecondsRemaining > 0) {
+                    const hours = Math.floor(totalSecondsRemaining / 3600);
+                    const minutes = Math.floor((totalSecondsRemaining % 3600) / 60);
+                    const seconds = Math.floor(totalSecondsRemaining % 60);
+                    
+                    // Set countdown immediately
+                    setCountdowns(prev => new Map(prev.set(productId, { hours, minutes, seconds })));
+                  }
+                }
+              }
             } else {
           setTaskStatuses(new Map(taskStatuses.set(productId, status)));
             }
