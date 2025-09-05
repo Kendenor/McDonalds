@@ -421,8 +421,17 @@ export class ProductTaskService {
               remainingActions: 0
             };
           } else {
-            // 24 hours have passed, actions should be reset for next cycle
-            console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, actions should be reset`);
+            // 24 hours have passed, reset actions for next cycle so user can perform again
+            console.log(`[TASK] 24-hour cooldown expired for ${task.productName}, resetting actions for next cycle (status check)`);
+            try {
+              await updateDoc(doc(db, this.collectionName, task.id), {
+                completedActions: 0,
+                currentActionStep: 1,
+                lastActionTime: null
+              });
+            } catch (e) {
+              console.error('[TASK] Failed to reset actions on cooldown expiry during status check:', e);
+            }
             return { 
               canComplete: false, 
               message: `Actions reset for next cycle! Complete 5 actions again to earn your daily reward.`,
